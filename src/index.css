@@ -1,0 +1,20 @@
+/* Google Fonts: Kinfolk風タイポグラフィ */
+@import url('https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,300;0,400;0,500;1,400&family=Noto+Serif+JP:wght@300;400;500&family=Inter:wght@300;400&display=swap');
+
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* ベーススタイル */
+html, body {
+  background: #ECE5D8;
+  color: #3A2F1F;
+  font-family: 'Noto Serif JP', '游明朝', 'Yu Mincho', serif;
+  font-weight: 300;
+  -webkit-font-smoothing: antialiased;
+  letter-spacing: 0.02em;
+}
+
+#root {
+  min-height: 100vh;
+}
