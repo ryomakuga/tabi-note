@@ -200,3 +200,46 @@
 - B. Phase 3 へ:F-08 写真ボックス、F-10 現地語併記、F-11 オフライン対応
 - C. UI の細かい調整、警告解消
 
+
+
+---
+
+## 2026-05-17:Step 15 中間セーブ — F-08 写真ボックス(途中)
+
+### 完了部分(Step 15-1, 15-2)
+
+**新規ファイル(コミット済み・動作未確認):**
+- src/lib/photos-store.ts(189行)
+  - Zustand ストア(usePhotosStore)
+  - 公開 API: loadPhotos, addPhotos, toggleFavorite, removePhoto
+  - EXIF パーサ内蔵(JPEG DateTimeOriginal 抽出、失敗時は File.lastModified)
+- src/components/PhotoBoxSection.tsx(252行)
+  - メインコンポーネント PhotoBoxSection
+  - サブ:EmptyState, PhotoGrid(不均等グリッド), PhotoCell, PhotoDetailModal
+  - 写真追加、お気に入り切替、削除、全画面プレビュー
+  - Blob → URL.createObjectURL で表示
+
+**TypeScript エラー: 0(両ファイルともクリーン)**
+
+### 未完了部分(Step 15-3、次回再開時に実施)
+
+TripDetail.tsx への組み込みが残っている。下記の手順で chapter six (Memories) セクションを追加する:
+
+1. `import { PhotoBoxSection } from "./PhotoBoxSection";` を追加
+2. chapter five (TimelineSection) の `</section>` の直後に chapter six セクションを追加
+   - 構造: section > div(label/heading/title-ja/title-en) > PhotoBoxSection tripId={trip.id}
+   - chapter four, five と同じパターンで OK
+
+### 組み込み後の動作確認
+
+- ブラウザハードリロード(Cmd + Shift + R)
+- 一番下までスクロール → chapter six 表示確認
+- 「+ add photos」で写真追加 → グリッド表示
+- 写真タップ → 全画面プレビュー
+- お気に入り切替 + 削除
+
+### Step 15 完了後の予定(攻略プラン)
+
+- Step 16: F-05b 地図表示(Leaflet + OpenStreetMap)
+- Step 17: F-10 現地語併記
+- Step 18: F-11 オフライン対応
