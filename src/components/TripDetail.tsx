@@ -13,6 +13,8 @@ import { TripFormModal } from './TripFormModal';
 import { ExternalLink } from './ExternalLink';
 import { getTimezoneOffsetText } from '../lib/timezones';
 import type { Flight, Hotel, Spot, Meal } from '../lib/types';
+import { buildTimelineItems, groupByDay, formatDayLabel, formatTime as formatTimelineTime } from '../lib/timeline-utils';
+import type { TimelineItem, TimelineDay } from '../lib/timeline-utils';
 
 export function TripDetail() {
   const selectedTripId = useUIStore((s) => s.selectedTripId);
@@ -21,6 +23,9 @@ export function TripDetail() {
   const trip = trips.find((t) => t.id === selectedTripId);
   const loadFlights = useFlightsStore((s) => s.loadFlights);
   const flights = useFlightsStore((s) => s.flights);
+  const allHotels = useHotelsStore((s) => s.hotels);
+  const allSpots = useSpotsStore((s) => s.spots);
+  const allMeals = useMealsStore((s) => s.meals);
   const [isFlightModalOpen, setIsFlightModalOpen] = useState(false);
   const [editingFlight, setEditingFlight] = useState<Flight | undefined>(undefined);
   const [isHotelModalOpen, setIsHotelModalOpen] = useState(false);
@@ -134,6 +139,24 @@ export function TripDetail() {
           <MealFilterTabs tripId={trip.id} filter={mealFilter} onFilterChange={setMealFilter} />
           <MealList tripId={trip.id} filter={mealFilter} onEdit={(m) => { setEditingMeal(m); setIsMealModalOpen(true); }} />
           <button onClick={() => { setEditingMeal(undefined); setIsMealModalOpen(true); }} className="w-full mt-6 py-3 border border-dashed border-text-sub/30 hover:border-accent text-[10px] tracking-[0.35em] uppercase text-text-sub hover:text-text transition-colors">+ Add Meal</button>
+        </section>
+        <section className="mt-10">
+          <div className="mb-7">
+            <p className="font-serif italic text-[12px] tracking-[0.2em] text-gold mb-2">— chapter five</p>
+            <h2 className="font-serif font-light text-3xl text-text leading-none tracking-tight mb-2">Timeline</h2>
+            <p className="font-serif-ja text-[13px] text-text-sub tracking-[0.05em]">旅程</p>
+          </div>
+          <TimelineSection
+            tripId={trip.id}
+            flights={flights.filter((f) => f.tripId === trip.id)}
+            hotels={allHotels.filter((h) => h.tripId === trip.id)}
+            spots={allSpots.filter((s) => s.tripId === trip.id)}
+            meals={allMeals.filter((m) => m.tripId === trip.id)}
+            onEditFlight={(f) => { setEditingFlight(f); setIsFlightModalOpen(true); }}
+            onEditHotel={(h) => { setEditingHotel(h); setIsHotelModalOpen(true); }}
+            onEditSpot={(s) => { setEditingSpot(s); setIsSpotModalOpen(true); }}
+            onEditMeal={(m) => { setEditingMeal(m); setIsMealModalOpen(true); }}
+          />
         </section>
 
 
@@ -426,5 +449,184 @@ function formatMealTime(iso: string): string {
   const m = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
   const pad = (n: number) => String(n).padStart(2, '0');
   return `${d.getDate()} ${m[d.getMonth()]} · ${pad(d.getHours())}:${pad(d.getMinutes())}`;
+}
+
+// ===== F-07 Timeline ===========================================================
+
+function TimelineSection({
+  tripId: _tripId,
+  flights,
+  hotels,
+  spots,
+  meals,
+  onEditFlight,
+  onEditHotel,
+  onEditSpot,
+  onEditMeal,
+}: {
+  tripId: string;
+  flights: Flight[];
+  hotels: Hotel[];
+  spots: Spot[];
+  meals: Meal[];
+  onEditFlight: (f: Flight) => void;
+  onEditHotel: (h: Hotel) => void;
+  onEditSpot: (s: Spot) => void;
+  onEditMeal: (m: Meal) => void;
+}) {
+  const items = buildTimelineItems(flights, hotels, spots, meals);
+  const days = groupByDay(items);
+
+  if (days.length === 0) {
+    return (
+      <p className="font-serif-ja text-[12px] text-text-sub text-center py-10 italic">
+        — まだ予定がありません —
+      </p>
+    );
+  }
+
+  const handleClick = (item: TimelineItem) => {
+    switch (item.category) {
+      case 'flight':
+        onEditFlight(item.raw as Flight);
+        break;
+      case 'hotel-in':
+      case 'hotel-out':
+        onEditHotel(item.raw as Hotel);
+        break;
+      case 'spot':
+        onEditSpot(item.raw as Spot);
+        break;
+      case 'meal':
+        onEditMeal(item.raw as Meal);
+        break;
+    }
+  };
+
+  return (
+    <div>
+      {days.map((day: TimelineDay, idx: number) => (
+        <TimelineDayBlock
+          key={day.date}
+          day={day}
+          dayIndex={idx + 1}
+          onClickItem={handleClick}
+        />
+      ))}
+    </div>
+  );
+}
+
+function TimelineDayBlock({
+  day,
+  dayIndex,
+  onClickItem,
+}: {
+  day: TimelineDay;
+  dayIndex: number;
+  onClickItem: (item: TimelineItem) => void;
+}) {
+  const label = formatDayLabel(day.date, dayIndex);
+
+  return (
+    <div className="mb-10">
+      <div className="flex items-baseline gap-4 mb-5 pb-2 border-b border-text-sub/15">
+        <p className="font-serif font-light text-[26px] text-text leading-none">
+          {label.dayLabel.split(' ')[0]}
+          <sup className="font-serif italic text-[12px] text-accent ml-1 tracking-[0.1em]">
+            {label.dayLabel.split(' ')[1]}
+          </sup>
+        </p>
+        <div className="flex-1">
+          <p className="font-serif italic text-[11px] text-text-sub tracking-[0.15em]">
+            {label.dateLabel} · {label.weekday}
+          </p>
+        </div>
+      </div>
+
+      <div>
+        {day.items.map((item) => (
+          <TimelineEntry key={item.id} item={item} onClick={() => onClickItem(item)} />
+        ))}
+      </div>
+    </div>
+  );
+}
+
+function TimelineEntry({ item, onClick }: { item: TimelineItem; onClick: () => void }) {
+  const borderColor = getCategoryBorderColor(item.category);
+  const categoryLabel = getCategoryLabel(item.category);
+
+  return (
+    <button
+      onClick={onClick}
+      className="w-full text-left grid grid-cols-[64px_1fr] gap-5 py-6 border-b border-text-sub/10 hover:bg-bg-alt/40 transition-colors"
+    >
+      <div className="pt-0.5">
+        {item.hasTime ? (
+          <>
+            <p className="font-serif text-[20px] text-text leading-none tracking-[0.03em]">
+              {formatTimelineTime(item.datetime)}
+            </p>
+            {item.endTime && (
+              <p className="font-serif italic font-light text-[12px] text-text-sub mt-1 tracking-[0.05em]">
+                → {formatTimelineTime(item.endTime)}
+              </p>
+            )}
+          </>
+        ) : (
+          <p className="font-serif italic text-[11px] text-text-sub leading-none">— all day —</p>
+        )}
+      </div>
+
+      <div className={`min-w-0 border-l pl-4 ${borderColor}`}>
+        <p className="font-sans text-[8.5px] tracking-[0.35em] uppercase text-accent mb-2">
+          — {categoryLabel}
+        </p>
+        <p className="font-serif-ja text-[15px] text-text tracking-[0.04em] leading-snug mb-1">
+          {item.title}
+        </p>
+        {item.titleLocal && (
+          <p className="font-serif italic text-[12px] text-text-sub leading-snug mb-2">
+            {item.titleLocal}
+          </p>
+        )}
+        {item.detail && (
+          <p className="font-serif-ja text-[11px] text-text-sub leading-relaxed line-clamp-2">
+            {item.detail}
+          </p>
+        )}
+      </div>
+    </button>
+  );
+}
+
+function getCategoryBorderColor(category: TimelineItem['category']): string {
+  switch (category) {
+    case 'flight':
+      return 'border-gold';
+    case 'hotel-in':
+    case 'hotel-out':
+      return 'border-olive';
+    case 'spot':
+      return 'border-accent';
+    case 'meal':
+      return 'border-secondary';
+  }
+}
+
+function getCategoryLabel(category: TimelineItem['category']): string {
+  switch (category) {
+    case 'flight':
+      return 'Flight';
+    case 'hotel-in':
+      return 'Check-in';
+    case 'hotel-out':
+      return 'Check-out';
+    case 'spot':
+      return 'Place';
+    case 'meal':
+      return 'Meal';
+  }
 }
 

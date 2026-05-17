@@ -134,3 +134,69 @@
 - B. F-07 タイムライン表示(全予定統合) ← おすすめ、Phase 2 フィナーレ
 - C. UI の細かい調整(警告解消等)
 
+
+---
+
+## 2026-05-17:Step 14 完了 — F-07 タイムライン表示(Phase 2 フィナーレ)
+
+### Step 14: F-07 タイムライン表示の実装
+
+**新規ファイル:**
+- `src/lib/timeline-utils.ts`(192行) - 全エンティティ → TimelineItem 変換 + 日付グルーピング + ソート
+  - 型: `TimelineCategory`, `TimelineItem`, `TimelineDay`
+  - 関数: `buildTimelineItems`, `groupByDay`, `formatDayLabel`, `formatTime`
+  - Spot/Meal は「確定 + scheduledAt あり」のみタイムライン表示
+
+**TripDetail.tsx 拡張:**
+- chapter five (Timeline / 旅程) セクション追加(行 145〜163)
+- サブコンポーネント追加: `TimelineSection` / `TimelineDayBlock` / `TimelineEntry`
+- ヘルパー: `getCategoryBorderColor` / `getCategoryLabel`
+- 行数:430 → 632行
+
+**デザイン:**
+- timeline_day01.html モックを忠実再現
+- Day ヘッダー: 「Day 01」(Cormorant Garamond) + 「28 June · Sunday」
+- 時刻表示: 09:30 / → 12:25(フライトの場合)
+- カテゴリ別の左縦線色: flight=gold, hotel-in/out=olive, spot=accent, meal=secondary
+- カードタップで該当エンティティの編集モーダルが開く
+
+### トラブルと修正
+
+**問題1: formatTime 関数の二重定義(SyntaxError)**
+- 既存 TripDetail.tsx 237行に `function formatTime` があった
+- timeline-utils.ts でも `export function formatTime` を作って import
+- → ブラウザで画面が真っ白に
+- 修正:import 時に `formatTime as formatTimelineTime` でエイリアス
+
+**問題2: タイムゾーンずれ(UTC vs JST)**
+- MealFormModal/FlightFormModal は `new Date(local).toISOString()` で **UTC 化**保存
+- timeline-utils の `groupByDay` で `.slice(0, 10)` を使うと **UTC の日付**でグループ化
+- 症状:
+  - VN336(7/1 01:10 JST = 6/30 16:10 UTC)が Day 03 に出る
+  - マダムラン(6/29 18:00 JST = 6/29 09:00 UTC)が Day 02 と Day 03 の両方に出る現象
+- 修正:`groupByDay` の日付抽出を **`getFullYear/getMonth/getDate`(ローカルタイム基準)**に変更
+- → 全予定が正しい日付グループに、重複も解消
+
+### 次回参考のトラブルメモ追加
+
+- **関数名の衝突**:同名関数が複数定義されると JS は SyntaxError で死ぬ。import エイリアス(`as`)で回避
+- **UTC vs ローカルタイムの罠**:`toISOString()` は UTC を返す。日付グループ化はローカルタイム基準(`getFullYear/getMonth/getDate`)で
+- **TypeScript エラーが 0 でもブラウザでクラッシュ**:JS 実行時エラーは Chrome 開発者ツールの Console タブで確認
+
+### Phase 進捗
+
+- Phase 1:✅ 完了
+- Phase 2:✅ F-03, F-04, F-05a, F-06, **F-07 完了!**(F-05b 地図のみ未実装、Phase 3 と並列で OK)
+- Phase 3 以降:未着手
+
+### 現状の問題タブ
+
+- エラー:0
+- 警告:既存のみ(F-07 追加で新エラーなし)
+
+### 次回の選択肢
+
+- A. F-05b 地図表示(Leaflet + OpenStreetMap)
+- B. Phase 3 へ:F-08 写真ボックス、F-10 現地語併記、F-11 オフライン対応
+- C. UI の細かい調整、警告解消
+
