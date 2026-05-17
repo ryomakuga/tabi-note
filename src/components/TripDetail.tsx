@@ -6,6 +6,7 @@ import { FlightFormModal } from './FlightFormModal';
 import { HotelFormModal } from './HotelFormModal';
 import { SpotFormModal } from './SpotFormModal';
 import { MealFormModal } from './MealFormModal';
+import { PhotoBoxSection } from './PhotoBoxSection';
 import { useSpotsStore } from '../lib/spots-store';
 import { useMealsStore } from '../lib/meals-store';
 import { useHotelsStore } from '../lib/hotels-store';
@@ -157,6 +158,17 @@ export function TripDetail() {
             onEditSpot={(s) => { setEditingSpot(s); setIsSpotModalOpen(true); }}
             onEditMeal={(m) => { setEditingMeal(m); setIsMealModalOpen(true); }}
           />
+        </section>
+
+        {/* chapter six : Memories / 旅の記憶 */}
+        <section className="mb-12">
+          <div className="mb-6">
+            <p className="font-serif italic text-[12px] tracking-[0.2em] text-gold mb-2">— chapter six</p>
+            <h2 className="font-serif text-[40px] leading-[0.95] text-text mb-3 tracking-[-0.01em]">Memories</h2>
+            <p className="font-serif-ja text-[15px] text-text mb-1 tracking-[0.06em]">旅の記憶</p>
+            <p className="font-serif italic text-[13px] text-text-sub tracking-[0.05em]">moments quietly gathered</p>
+          </div>
+          <PhotoBoxSection tripId={trip.id} />
         </section>
 
 

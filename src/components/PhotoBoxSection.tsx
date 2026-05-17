@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
 import { usePhotosStore } from '../lib/photos-store';
+import { PhotoGalleryModal } from './PhotoGalleryModal';
 import type { Photo } from '../lib/types';
 
 interface Props {
@@ -15,6 +16,7 @@ export function PhotoBoxSection({ tripId }: Props) {
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [isAdding, setIsAdding] = useState(false);
   const [selectedPhoto, setSelectedPhoto] = useState<Photo | null>(null);
+  const [isGalleryOpen, setIsGalleryOpen] = useState(false);
 
   useEffect(() => {
     if (tripId) loadPhotos(tripId);
@@ -39,6 +41,7 @@ export function PhotoBoxSection({ tripId }: Props) {
   };
 
   const favCount = photos.filter((p) => p.isFavorite).length;
+  const dayCount = countUniqueDays(photos);
 
   return (
     <>
@@ -47,8 +50,13 @@ export function PhotoBoxSection({ tripId }: Props) {
         <div className="font-serif italic text-[13px] text-text">
           <span className="text-[20px] text-accent mr-1">{photos.length}</span>
           <span>枚の写真</span>
-          {favCount > 0 && (
+          {dayCount > 0 && (
             <span className="ml-3 text-text-sub text-[11px]">
+              · {dayCount} 日間
+            </span>
+          )}
+          {favCount > 0 && (
+            <span className="ml-2 text-text-sub text-[11px]">
               · {favCount} お気に入り
             </span>
           )}
@@ -74,7 +82,24 @@ export function PhotoBoxSection({ tripId }: Props) {
       {photos.length === 0 ? (
         <EmptyState onAdd={() => fileInputRef.current?.click()} />
       ) : (
-        <PhotoGrid photos={photos} onSelect={setSelectedPhoto} />
+        <>
+          <PhotoGrid photos={photos.slice(0, 10)} onSelect={setSelectedPhoto} />
+
+          {/* すべて見るボタン */}
+          <div className="mt-7 pt-6 border-t border-line text-center">
+            <button
+              onClick={() => setIsGalleryOpen(true)}
+              className="inline-block border border-accent px-7 py-3 font-serif text-[10.5px] tracking-[0.4em] uppercase text-text hover:bg-accent hover:text-bg transition-colors"
+            >
+              — see all ({photos.length}) —
+            </button>
+            {photos.length > 10 && (
+              <p className="font-serif italic text-[11px] text-text-sub mt-3 tracking-[0.1em]">
+                {photos.length - 10} more photos in the gallery
+              </p>
+            )}
+          </div>
+        </>
       )}
 
       {/* 写真詳細モーダル */}
@@ -82,6 +107,14 @@ export function PhotoBoxSection({ tripId }: Props) {
         <PhotoDetailModal
           photo={selectedPhoto}
           onClose={() => setSelectedPhoto(null)}
+        />
+      )}
+
+      {/* ギャラリー全画面オーバーレイ */}
+      {isGalleryOpen && (
+        <PhotoGalleryModal
+          tripId={tripId}
+          onClose={() => setIsGalleryOpen(false)}
         />
       )}
     </>
@@ -249,4 +282,14 @@ function formatPhotoDate(iso: string): string {
   } catch {
     return iso;
   }
+}
+
+function countUniqueDays(photos: Photo[]): number {
+  const set = new Set<string>();
+  for (const p of photos) {
+    const d = new Date(p.takenAt);
+    const pad = (n: number) => String(n).padStart(2, '0');
+    set.add(`${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`);
+  }
+  return set.size;
 }
