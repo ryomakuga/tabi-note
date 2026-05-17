@@ -280,7 +280,27 @@ function HotelCard({ hotel, onEdit }: { hotel: Hotel; onEdit: (h: Hotel) => void
     <button onClick={() => onEdit(hotel)} className="w-full text-left bg-bg-alt/60 hover:bg-bg-alt p-5 border-l-2 border-olive transition-colors">
       <p className="font-serif text-lg text-text tracking-wide mb-2">{hotel.name}</p>
       <p className="font-serif-ja text-[12px] text-text leading-relaxed mb-1">{hotel.address}</p>
-      {hotel.addressLocal && (<p className="font-serif italic text-[11px] text-text-sub leading-relaxed mb-3">{hotel.addressLocal}</p>)}
+      {hotel.addressLocal && (
+        <div className="mb-3 flex items-start gap-2 group">
+          <p className="font-serif italic text-[11px] text-text-sub leading-relaxed flex-1">
+            {hotel.addressLocal}
+          </p>
+          <button
+            onClick={(e) => {
+              e.stopPropagation();
+              navigator.clipboard.writeText(hotel.addressLocal);
+              const btn = e.currentTarget;
+              const orig = btn.textContent;
+              btn.textContent = '✓ copied';
+              setTimeout(() => { if (btn.textContent === '✓ copied') btn.textContent = orig; }, 1500);
+            }}
+            className="text-[9px] font-serif italic text-accent tracking-[0.2em] hover:text-text border border-line hover:border-accent px-2 py-1 transition-colors shrink-0"
+            title="住所をコピー(タクシー運転手に見せる用)"
+          >
+            copy
+          </button>
+        </div>
+      )}
       <div className="mt-3 pt-3 border-t border-text-sub/15 flex justify-between items-baseline">
         <div>
           <p className="font-sans text-[8px] tracking-[0.3em] uppercase text-text-sub/70 mb-0.5">Check-in</p>
