@@ -7,6 +7,7 @@ import { HotelFormModal } from './HotelFormModal';
 import { SpotFormModal } from './SpotFormModal';
 import { MealFormModal } from './MealFormModal';
 import { PhotoBoxSection } from './PhotoBoxSection';
+import { SpotMapView } from './SpotMapView';
 import { useSpotsStore } from '../lib/spots-store';
 import { useMealsStore } from '../lib/meals-store';
 import { useHotelsStore } from '../lib/hotels-store';
@@ -34,6 +35,7 @@ export function TripDetail() {
   const [isSpotModalOpen, setIsSpotModalOpen] = useState(false);
   const [editingSpot, setEditingSpot] = useState<Spot | undefined>(undefined);
   const [spotFilter, setSpotFilter] = useState<'all' | 'draft' | 'confirmed'>('all');
+  const [spotView, setSpotView] = useState<'list' | 'map'>('list');
   const [isMealModalOpen, setIsMealModalOpen] = useState(false);
   const [editingMeal, setEditingMeal] = useState<Meal | undefined>(undefined);
   const [mealFilter, setMealFilter] = useState<'all' | 'draft' | 'confirmed'>('all');
@@ -127,8 +129,33 @@ export function TripDetail() {
             <h2 className="font-serif font-light text-3xl text-text leading-none tracking-tight mb-2">Places</h2>
             <p className="font-serif-ja text-[13px] text-text-sub tracking-[0.05em]">場所</p>
           </div>
-          <SpotFilterTabs tripId={trip.id} filter={spotFilter} onFilterChange={setSpotFilter} />
-          <SpotList tripId={trip.id} filter={spotFilter} onEdit={(s) => { setEditingSpot(s); setIsSpotModalOpen(true); }} />
+          <div className="flex justify-center gap-7 py-4 border-y border-line mb-7">
+            <button
+              onClick={() => setSpotView('list')}
+              className={'font-serif text-[11px] tracking-[0.35em] uppercase pb-1 transition-colors ' + (spotView === 'list' ? 'text-text border-b border-accent' : 'text-text-sub hover:text-text')}
+            >
+              — List
+            </button>
+            <button
+              onClick={() => setSpotView('map')}
+              className={'font-serif text-[11px] tracking-[0.35em] uppercase pb-1 transition-colors ' + (spotView === 'map' ? 'text-text border-b border-accent' : 'text-text-sub hover:text-text')}
+            >
+              — Map
+            </button>
+          </div>
+
+          {spotView === 'list' ? (
+            <>
+              <SpotFilterTabs tripId={trip.id} filter={spotFilter} onFilterChange={setSpotFilter} />
+              <SpotList tripId={trip.id} filter={spotFilter} onEdit={(s) => { setEditingSpot(s); setIsSpotModalOpen(true); }} />
+            </>
+          ) : (
+            <SpotMapView
+              spots={allSpots.filter((s) => s.tripId === trip.id)}
+              hotels={allHotels.filter((h) => h.tripId === trip.id)}
+              onSpotClick={(s) => { setEditingSpot(s); setIsSpotModalOpen(true); }}
+            />
+          )}
           <button onClick={() => { setEditingSpot(undefined); setIsSpotModalOpen(true); }} className="w-full mt-6 py-3 border border-dashed border-text-sub/30 hover:border-accent text-[10px] tracking-[0.35em] uppercase text-text-sub hover:text-text transition-colors">+ Add Place</button>
         </section>
         <section className="mt-10">

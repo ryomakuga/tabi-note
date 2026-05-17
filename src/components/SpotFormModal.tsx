@@ -20,6 +20,9 @@ export function SpotFormModal({ tripId, spot, onClose }: Props) {
   const [status, setStatus] = useState<'draft' | 'confirmed'>(spot?.status ?? 'draft');
   const [memo, setMemo] = useState(spot?.memo ?? '');
   const [urls, setUrls] = useState<string[]>(spot?.urls ?? []);
+  const [lat, setLat] = useState<string>(spot?.lat != null ? String(spot.lat) : '');
+  const [lng, setLng] = useState<string>(spot?.lng != null ? String(spot.lng) : '');
+  const [coordsError, setCoordsError] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
 
@@ -29,6 +32,16 @@ export function SpotFormModal({ tripId, spot, onClose }: Props) {
     setError(null);
     setIsSubmitting(true);
     try {
+      const latNum = lat.trim() ? parseFloat(lat.trim()) : undefined;
+      const lngNum = lng.trim() ? parseFloat(lng.trim()) : undefined;
+      if (latNum !== undefined && (isNaN(latNum) || latNum < -90 || latNum > 90)) {
+        setIsSubmitting(false);
+        return setError('緯度は -90 〜 90 の数値で入力してください');
+      }
+      if (lngNum !== undefined && (isNaN(lngNum) || lngNum < -180 || lngNum > 180)) {
+        setIsSubmitting(false);
+        return setError('経度は -180 〜 180 の数値で入力してください');
+      }
       const data = {
         tripId,
         name: name.trim(),
@@ -36,6 +49,8 @@ export function SpotFormModal({ tripId, spot, onClose }: Props) {
         status,
         memo: memo.trim() || undefined,
         urls: urls.length > 0 ? urls : undefined,
+        lat: latNum,
+        lng: lngNum,
       };
       if (isEdit && spot) {
         await updateSpot(spot.id, data);
@@ -144,6 +159,56 @@ export function SpotFormModal({ tripId, spot, onClose }: Props) {
             </p>
           </Field>
 
+          <Field label="COORDINATES" labelJa="位置情報(地図ピン用)" optional>
+            <div className="grid grid-cols-2 gap-2 mb-2">
+              <input
+                type="text"
+                value={lat}
+                onChange={(e) => { setLat(e.target.value); setCoordsError(null); }}
+                className="form-input"
+                placeholder="緯度 (例: 16.0034)"
+                inputMode="decimal"
+              />
+              <input
+                type="text"
+                value={lng}
+                onChange={(e) => { setLng(e.target.value); setCoordsError(null); }}
+                className="form-input"
+                placeholder="経度 (例: 108.2622)"
+                inputMode="decimal"
+              />
+            </div>
+            <div className="flex items-center gap-2">
+              <button
+                type="button"
+                onClick={async () => {
+                  setCoordsError(null);
+                  try {
+                    const text = await navigator.clipboard.readText();
+                    const coords = extractCoordsFromMapsUrl(text);
+                    if (coords) {
+                      setLat(String(coords.lat));
+                      setLng(String(coords.lng));
+                    } else {
+                      setCoordsError('クリップボードから座標を抽出できませんでした。Google マップの URL をコピーしてからお試しください。');
+                    }
+                  } catch {
+                    setCoordsError('クリップボードの読み取りに失敗しました');
+                  }
+                }}
+                className="font-serif italic text-[10px] tracking-[0.2em] text-accent hover:text-text border border-line hover:border-accent px-3 py-1.5 transition-colors"
+              >
+                — Google マップ URL から自動取得 —
+              </button>
+            </div>
+            {coordsError && (
+              <p className="font-serif-ja text-[10px] text-red-700/80 mt-2">{coordsError}</p>
+            )}
+            <p className="font-serif-ja text-[10px] text-text-sub/70 mt-2 italic">
+              地図上にピン表示するための座標。Google マップで場所を開いて URL をコピーすれば自動入力できます。
+            </p>
+          </Field>
+
           {error && (
             <p className="font-serif-ja text-[12px] text-red-700/80 bg-red-50/50 px-3 py-2">
               {error}
@@ -183,6 +248,17 @@ export function SpotFormModal({ tripId, spot, onClose }: Props) {
       </div>
     </div>
   );
+}
+
+
+function extractCoordsFromMapsUrl(url: string): { lat: number; lng: number } | null {
+  const m1 = url.match(/@(-?\d+\.\d+),(-?\d+\.\d+)/);
+  if (m1) return { lat: parseFloat(m1[1]), lng: parseFloat(m1[2]) };
+  const m2 = url.match(/[?&]q=(-?\d+\.\d+),(-?\d+\.\d+)/);
+  if (m2) return { lat: parseFloat(m2[1]), lng: parseFloat(m2[2]) };
+  const m3 = url.match(/!3d(-?\d+\.\d+)!4d(-?\d+\.\d+)/);
+  if (m3) return { lat: parseFloat(m3[1]), lng: parseFloat(m3[2]) };
+  return null;
 }
 
 function Field({
