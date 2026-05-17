@@ -10,6 +10,7 @@ import { useUIStore } from '../lib/ui-store';
 import { useAuthStore } from '../lib/auth-store';
 import type { Trip } from '../lib/types';
 import { TripFormModal } from './TripFormModal';
+import { SettingsMenu } from './SettingsMenu';
 
 export function TripsHome() {
   const { trips, loadTrips, getUpcomingTrips, getPastTrips, getDaysUntilStart} = useTripsStore();
@@ -68,7 +69,7 @@ export function TripsHome() {
           </div>
         </div>
         {isFormOpen && <TripFormModal onClose={() => setIsFormOpen(false)} />}
-        {showSettings && <SettingsMenu onClose={() => setShowSettings(false)} onLock={lock} />}
+        {showSettings && <SettingsMenu onClose={() => setShowSettings(false)} />}
       </>
     );
   }
@@ -162,7 +163,7 @@ export function TripsHome() {
       </div>
 
       {isFormOpen && <TripFormModal onClose={() => setIsFormOpen(false)} />}
-      {showSettings && <SettingsMenu onClose={() => setShowSettings(false)} onLock={lock} />}
+      {showSettings && <SettingsMenu onClose={() => setShowSettings(false)} />}
     </>
   );
 }
@@ -373,44 +374,6 @@ function PastTripCard({
 }
 
 // ───── 設定メニュー ─────
-function SettingsMenu({ onClose, onLock }: { onClose: () => void; onLock: () => void }) {
-  return (
-    <div
-      className="fixed inset-0 z-50 flex items-end justify-center bg-text/40"
-      onClick={onClose}
-    >
-      <div
-        className="w-full max-w-md bg-bg p-7 pb-12"
-        onClick={(e) => e.stopPropagation()}
-      >
-        <div
-          className="text-xs text-accent uppercase mb-6 text-center"
-          style={{ fontFamily: '"Cormorant Garamond", serif', letterSpacing: '0.45em' }}
-        >
-          — Settings
-        </div>
-        <button
-          onClick={() => {
-            onLock();
-            onClose();
-          }}
-          className="w-full py-4 border border-line text-text text-sm hover:bg-bg-alt transition-colors mb-3"
-          style={{ fontFamily: '"Cormorant Garamond", serif', letterSpacing: '0.3em' }}
-        >
-          — LOCK NOW —
-        </button>
-        <button
-          onClick={onClose}
-          className="w-full py-3 text-text-sub text-xs"
-          style={{ fontFamily: '"Cormorant Garamond", serif', fontStyle: 'italic' }}
-        >
-          cancel
-        </button>
-      </div>
-    </div>
-  );
-}
-
 // ───── ユーティリティ ─────
 function formatDateRange(start: string, end: string): string {
   const s = new Date(start);
