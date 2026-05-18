@@ -7,14 +7,12 @@
 import { useEffect, useState } from 'react';
 import { useTripsStore } from '../lib/trips-store';
 import { useUIStore } from '../lib/ui-store';
-import { useAuthStore } from '../lib/auth-store';
 import type { Trip } from '../lib/types';
 import { TripFormModal } from './TripFormModal';
 import { SettingsMenu } from './SettingsMenu';
 
 export function TripsHome() {
   const { trips, loadTrips, getUpcomingTrips, getPastTrips, getDaysUntilStart} = useTripsStore();
-  const { lock } = useAuthStore();
   const { openTrip } = useUIStore();
   const [isFormOpen, setIsFormOpen] = useState(false);
   const [showSettings, setShowSettings] = useState(false);

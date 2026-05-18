@@ -1,0 +1,11 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" role="img">
+  <title>Tabi Note</title>
+  <rect width="512" height="512" fill="#ECE5D8"/>
+  <g transform="translate(51.2, 51.2) scale(0.8)">
+    <rect x="16" y="16" width="480" height="480" rx="68" fill="none" stroke="#8B7355" stroke-width="2"/>
+    <circle cx="256" cy="180" r="24" fill="#5C7548"/>
+    <text x="256" y="318" text-anchor="middle" font-family="Cormorant Garamond, Georgia, serif" font-style="italic" font-size="92" font-weight="400" fill="#3A2F1F">Tabi</text>
+    <text x="256" y="404" text-anchor="middle" font-family="Cormorant Garamond, Georgia, serif" font-style="italic" font-size="92" font-weight="400" fill="#3A2F1F">Note</text>
+    <text x="256" y="456" text-anchor="middle" font-family="Inter, sans-serif" font-size="14" fill="#8B7355" letter-spacing="6">EST · 2026</text>
+  </g>
+</svg>

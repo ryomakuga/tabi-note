@@ -56,8 +56,8 @@ const mealIcon = L.divIcon({
 interface Props {
   spots: Spot[];
   hotels: Hotel[];
-  meals?: Meal[];
   onSpotClick?: (spot: Spot) => void;
+  meals?: Meal[];
   onMealClick?: (meal: Meal) => void;
 }
 
@@ -105,7 +105,7 @@ function FitBoundsToMarkers({
   return null;
 }
 
-export function SpotMapView({ spots, hotels, meals = [], onSpotClick, onMealClick }: Props) {
+export function SpotMapView({ spots, hotels, meals = [], onSpotClick: _onSpotClick, onMealClick }: Props) {
   // 座標を持つスポット・ホテル・食事だけ抽出
   const spotsWithCoords = spots.filter((s) => s.lat != null && s.lng != null);
   const mealsWithCoords = meals.filter((m) => m.lat != null && m.lng != null);

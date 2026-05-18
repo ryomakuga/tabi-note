@@ -61,7 +61,7 @@ export function TripFormModal({ trip, onClose }: TripFormModalProps) {
       title: title.trim(),
       destination: destination.trim(),
       origin: origin.trim() || '日本',
-      localLanguage: localLanguage.trim() || undefined,
+      localLanguage: localLanguage.trim(),
       timezone: selectedCountry?.timezone,
       startDate,
       endDate,
