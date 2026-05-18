@@ -38,6 +38,18 @@ const GENRE_PRESETS = [
   'その他',
 ];
 
+// Google マップの URL から座標を抽出
+function extractCoordsFromMapsUrl(url: string): { lat: number; lng: number } | null {
+  if (!url) return null;
+  let m = url.match(/@(-?\d+\.\d+),(-?\d+\.\d+)/);
+  if (m) return { lat: parseFloat(m[1]), lng: parseFloat(m[2]) };
+  m = url.match(/[?&]q=(-?\d+\.\d+),(-?\d+\.\d+)/);
+  if (m) return { lat: parseFloat(m[1]), lng: parseFloat(m[2]) };
+  m = url.match(/!3d(-?\d+\.\d+)!4d(-?\d+\.\d+)/);
+  if (m) return { lat: parseFloat(m[1]), lng: parseFloat(m[2]) };
+  return null;
+}
+
 export function MealFormModal({ tripId, meal, onClose }: Props) {
   const isEdit = !!meal;
   const createMeal = useMealsStore((s) => s.createMeal);
@@ -53,6 +65,9 @@ export function MealFormModal({ tripId, meal, onClose }: Props) {
   );
   const [memo, setMemo] = useState(meal?.memo ?? '');
   const [mapUrl, setMapUrl] = useState(meal?.mapUrl ?? '');
+  const [lat, setLat] = useState<string>(meal?.lat != null ? String(meal.lat) : '');
+  const [lng, setLng] = useState<string>(meal?.lng != null ? String(meal.lng) : '');
+  const [coordsError, setCoordsError] = useState<string | null>(null);
   const [urls, setUrls] = useState<string[]>(meal?.urls ?? []);
   const [error, setError] = useState<string | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -75,6 +90,8 @@ export function MealFormModal({ tripId, meal, onClose }: Props) {
           : undefined,
         memo: memo.trim() || undefined,
         mapUrl: mapUrl.trim() || undefined,
+        lat: lat ? parseFloat(lat) : undefined,
+        lng: lng ? parseFloat(lng) : undefined,
         urls: urls.length > 0 ? urls : undefined,
       };
       if (isEdit && meal) {
@@ -216,6 +233,97 @@ export function MealFormModal({ tripId, meal, onClose }: Props) {
               className="form-input font-mono text-[11px]"
               placeholder="https://maps.google.com/..."
             />
+          </Field>
+
+          <Field label="COORDINATES" labelJa="位置情報(地図ピン用)" optional>
+            <div className="border border-line bg-bg-alt/60 p-5 mb-3">
+              <p className="font-serif italic text-[11px] tracking-[0.2em] text-gold mb-3">
+                — how to set
+              </p>
+              <p className="font-serif-ja text-[12px] text-text leading-relaxed mb-4">
+                かんたん 2 ステップで地図ピンを設定
+              </p>
+
+              <div className="mb-4">
+                <p className="font-sans text-[9px] tracking-[0.3em] uppercase text-accent mb-2">
+                  — step 01
+                </p>
+                <p className="font-serif-ja text-[12px] text-text mb-2 leading-relaxed">
+                  Google マップで <span className="font-serif italic">{name || '店名'}</span> を検索
+                </p>
+                
+                  <a
+                  href={name.trim() ? 'https://www.google.com/maps/search/' + encodeURIComponent(name.trim()) : '#'}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  onClick={(e) => { if (!name.trim()) e.preventDefault(); }}
+                  className={'maps-search-link inline-block w-full text-center py-3 px-4 font-serif text-[11px] tracking-[0.3em] uppercase transition-colors ' + (name.trim() ? 'bg-text text-bg hover:bg-accent' : 'bg-bg-alt text-text-sub border border-line cursor-not-allowed opacity-60')}
+                >
+                  {name.trim() ? '🗺  Google マップで開く →' : '店名を入力してください'}
+                </a>
+              </div>
+
+              <div>
+                <p className="font-sans text-[9px] tracking-[0.3em] uppercase text-accent mb-2">
+                  — step 02
+                </p>
+                <p className="font-serif-ja text-[12px] text-text mb-2 leading-relaxed">
+                  地図ページの URL をコピーしてから、下のボタンをタップ
+                </p>
+                <button
+                  type="button"
+                  onClick={async () => {
+                    setCoordsError(null);
+                    try {
+                      const text = await navigator.clipboard.readText();
+                      const coords = extractCoordsFromMapsUrl(text);
+                      if (coords) {
+                        setLat(String(coords.lat));
+                        setLng(String(coords.lng));
+                      } else {
+                        setCoordsError('クリップボードに Google マップの URL が見つかりません。地図ページの URL をコピーしてからもう一度お試しください。');
+                      }
+                    } catch {
+                      setCoordsError('クリップボードの読み取りに失敗しました');
+                    }
+                  }}
+                  className="w-full py-3 px-4 border-2 border-accent bg-bg text-text font-serif text-[11px] tracking-[0.3em] uppercase hover:bg-accent hover:text-bg transition-colors"
+                >
+                  📋  クリップボードから座標を取得
+                </button>
+              </div>
+
+              {coordsError && (
+                <p className="font-serif-ja text-[11px] text-red-700/80 mt-3 leading-relaxed">{coordsError}</p>
+              )}
+            </div>
+
+            <p className="font-serif italic text-[10px] tracking-[0.15em] text-text-sub mb-2">
+              — coordinates(or manual)
+            </p>
+            <div className="grid grid-cols-2 gap-2">
+              <input
+                type="text"
+                value={lat}
+                onChange={(e) => { setLat(e.target.value); setCoordsError(null); }}
+                className="form-input"
+                placeholder="緯度 (例: 16.0034)"
+                inputMode="decimal"
+              />
+              <input
+                type="text"
+                value={lng}
+                onChange={(e) => { setLng(e.target.value); setCoordsError(null); }}
+                className="form-input"
+                placeholder="経度 (例: 108.2622)"
+                inputMode="decimal"
+              />
+            </div>
+            {(lat || lng) && (
+              <p className="font-serif italic text-[10px] tracking-[0.05em] text-olive mt-2">
+                ✓ 座標が設定されています
+              </p>
+            )}
           </Field>
 
           <Field label="MEMO" labelJa="メモ" optional>

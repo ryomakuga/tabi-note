@@ -78,6 +78,8 @@ export interface Meal {
   scheduledAt?: string;
   memo?: string;
   mapUrl?: string;
+  lat?: number;
+  lng?: number;
   urls?: string[];
   createdAt: string;
   updatedAt: string;
