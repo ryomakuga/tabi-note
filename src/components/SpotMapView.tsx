@@ -7,7 +7,7 @@
 import { useEffect } from 'react';
 import { MapContainer, TileLayer, Marker, Popup, useMap } from 'react-leaflet';
 import L from 'leaflet';
-import type { Spot, Hotel } from '../lib/types';
+import type { Spot, Hotel, Meal } from '../lib/types';
 
 // Leaflet のデフォルトアイコンを修正(Vite だとパスが壊れる問題への対処)
 const DefaultIcon = L.icon({
@@ -45,10 +45,20 @@ const hotelIcon = L.divIcon({
   iconAnchor: [6, 6],
 });
 
+// 食事用のカスタムアイコン(テラコッタ橙、四角・食器イメージ)
+const mealIcon = L.divIcon({
+  className: 'tabi-pin-meal',
+  html: '<div style="width:12px;height:12px;background:#C97C5D;border:2px solid #ECE5D8;box-shadow:0 2px 6px rgba(58,47,31,0.4);"></div>',
+  iconSize: [12, 12],
+  iconAnchor: [6, 6],
+});
+
 interface Props {
   spots: Spot[];
   hotels: Hotel[];
+  meals?: Meal[];
   onSpotClick?: (spot: Spot) => void;
+  onMealClick?: (meal: Meal) => void;
 }
 
 // ホテルの mapUrl から座標を抽出するヘルパー
@@ -60,7 +70,15 @@ function extractHotelCoords(h: Hotel): { lat: number; lng: number } | null {
 }
 
 // 全てのピンが画面に収まるよう自動フィット
-function FitBoundsToMarkers({ spots, hotelsWithCoords }: { spots: Spot[]; hotelsWithCoords: { lat: number; lng: number }[] }) {
+function FitBoundsToMarkers({
+  spots,
+  hotelsWithCoords,
+  meals,
+}: {
+  spots: Spot[];
+  hotelsWithCoords: { lat: number; lng: number }[];
+  meals: Meal[];
+}) {
   const map = useMap();
 
   useEffect(() => {
@@ -71,6 +89,9 @@ function FitBoundsToMarkers({ spots, hotelsWithCoords }: { spots: Spot[]; hotels
     hotelsWithCoords.forEach((h) => {
       points.push([h.lat, h.lng]);
     });
+    meals.forEach((m) => {
+      if (m.lat != null && m.lng != null) points.push([m.lat, m.lng]);
+    });
 
     if (points.length === 0) return;
     if (points.length === 1) {
@@ -79,14 +100,15 @@ function FitBoundsToMarkers({ spots, hotelsWithCoords }: { spots: Spot[]; hotels
     }
     const bounds = L.latLngBounds(points);
     map.fitBounds(bounds, { padding: [40, 40] });
-  }, [spots, hotelsWithCoords, map]);
+  }, [spots, hotelsWithCoords, meals, map]);
 
   return null;
 }
 
-export function SpotMapView({ spots, hotels, onSpotClick }: Props) {
-  // 座標を持つスポット・ホテルだけ抽出
+export function SpotMapView({ spots, hotels, meals = [], onSpotClick, onMealClick }: Props) {
+  // 座標を持つスポット・ホテル・食事だけ抽出
   const spotsWithCoords = spots.filter((s) => s.lat != null && s.lng != null);
+  const mealsWithCoords = meals.filter((m) => m.lat != null && m.lng != null);
   const hotelsWithCoords = hotels
     .map((h) => {
       const coords = extractHotelCoords(h);
@@ -94,7 +116,7 @@ export function SpotMapView({ spots, hotels, onSpotClick }: Props) {
     })
     .filter((h): h is Hotel & { _lat: number; _lng: number } => h !== null);
 
-  const hasAnyPin = spotsWithCoords.length > 0 || hotelsWithCoords.length > 0;
+  const hasAnyPin = spotsWithCoords.length > 0 || hotelsWithCoords.length > 0 || mealsWithCoords.length > 0;
 
   if (!hasAnyPin) {
     return (
@@ -126,7 +148,7 @@ export function SpotMapView({ spots, hotels, onSpotClick }: Props) {
           url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
         />
 
-        <FitBoundsToMarkers spots={spotsWithCoords} hotelsWithCoords={hotelsForBounds} />
+        <FitBoundsToMarkers spots={spotsWithCoords} hotelsWithCoords={hotelsForBounds} meals={mealsWithCoords} />
 
         {hotelsWithCoords.map((h) => (
           <Marker key={'h-' + h.id} position={[h._lat, h._lng]} icon={hotelIcon}>
@@ -178,6 +200,40 @@ export function SpotMapView({ spots, hotels, onSpotClick }: Props) {
                     Google マップで開く →
                   </a>
                 </div>
+              </div>
+            </Popup>
+          </Marker>
+        ))}
+
+        {mealsWithCoords.map((m) => (
+          <Marker
+            key={'m-' + m.id}
+            position={[m.lat as number, m.lng as number]}
+            icon={mealIcon}
+            eventHandlers={onMealClick ? { click: () => onMealClick(m) } : undefined}
+          >
+            <Popup>
+              <div style={{ fontFamily: 'serif', minWidth: 140 }}>
+                <p style={{ fontSize: 9, letterSpacing: '0.3em', textTransform: 'uppercase', margin: 0, marginBottom: 4, color: '#C97C5D' }}>
+                  — meal · {m.status === 'confirmed' ? 'confirmed' : 'draft'}
+                </p>
+                <p style={{ fontSize: 13, color: '#3A2F1F', margin: 0, lineHeight: 1.4, marginBottom: 2 }}>{m.name}</p>
+                {m.nameLocal && (
+                  <p style={{ fontSize: 11, fontStyle: 'italic', color: '#8B7355', margin: 0, marginBottom: 2 }}>{m.nameLocal}</p>
+                )}
+                {m.genre && (
+                  <p style={{ fontSize: 10, color: '#A8A293', margin: 0, marginBottom: 6 }}>{m.genre}</p>
+                )}
+                
+                  <a
+                  className="google-maps-popup-link"
+                  href={'https://www.google.com/maps/search/?api=1&query=' + m.lat + ',' + m.lng}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  style={{ display: 'block', textAlign: 'center', fontSize: 10, letterSpacing: '0.25em', color: '#C97C5D', textTransform: 'uppercase', padding: '4px 0', textDecoration: 'none', fontFamily: 'serif', borderTop: '1px solid rgba(58,47,31,0.15)', marginTop: 6 }}
+                >
+                  Google マップで開く →
+                </a>
               </div>
             </Popup>
           </Marker>

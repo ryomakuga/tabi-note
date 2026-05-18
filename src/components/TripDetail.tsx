@@ -153,7 +153,9 @@ export function TripDetail() {
             <SpotMapView
               spots={allSpots.filter((s) => s.tripId === trip.id)}
               hotels={allHotels.filter((h) => h.tripId === trip.id)}
+              meals={allMeals.filter((m) => m.tripId === trip.id)}
               onSpotClick={(s) => { setEditingSpot(s); setIsSpotModalOpen(true); }}
+              onMealClick={(m) => { setEditingMeal(m); setIsMealModalOpen(true); }}
             />
           )}
           <button onClick={() => { setEditingSpot(undefined); setIsSpotModalOpen(true); }} className="w-full mt-6 py-3 border border-dashed border-text-sub/30 hover:border-accent text-[10px] tracking-[0.35em] uppercase text-text-sub hover:text-text transition-colors">+ Add Place</button>
