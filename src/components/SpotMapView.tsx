@@ -131,9 +131,21 @@ export function SpotMapView({ spots, hotels, onSpotClick }: Props) {
         {hotelsWithCoords.map((h) => (
           <Marker key={'h-' + h.id} position={[h._lat, h._lng]} icon={hotelIcon}>
             <Popup>
-              <div style={{ fontFamily: 'serif', minWidth: 120 }}>
+              <div style={{ fontFamily: 'serif', minWidth: 160 }}>
                 <p style={{ fontSize: 9, letterSpacing: '0.3em', color: '#C49B5C', textTransform: 'uppercase', margin: 0, marginBottom: 4 }}>— stay</p>
-                <p style={{ fontSize: 13, color: '#3A2F1F', margin: 0, lineHeight: 1.4 }}>{h.name}</p>
+                <p style={{ fontSize: 13, color: '#3A2F1F', margin: 0, lineHeight: 1.4, marginBottom: 8 }}>{h.name}</p>
+                <div style={{ borderTop: '0.5px solid rgba(58,47,31,0.15)', paddingTop: 8, marginTop: 4 }}>
+                  
+                    <a
+                    className="google-maps-popup-link"
+                    href={'https://www.google.com/maps/search/?api=1&query=' + h._lat + ',' + h._lng}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    style={{ display: 'block', textAlign: 'center', fontSize: 10, letterSpacing: '0.25em', color: '#C49B5C', textTransform: 'uppercase', padding: '4px 0', textDecoration: 'none', fontFamily: 'serif' }}
+                  >
+                    Google マップで開く →
+                  </a>
+                </div>
               </div>
             </Popup>
           </Marker>
@@ -144,17 +156,28 @@ export function SpotMapView({ spots, hotels, onSpotClick }: Props) {
             key={'s-' + s.id}
             position={[s.lat as number, s.lng as number]}
             icon={s.status === 'confirmed' ? confirmedIcon : draftIcon}
-            eventHandlers={onSpotClick ? { click: () => onSpotClick(s) } : undefined}
           >
             <Popup>
-              <div style={{ fontFamily: 'serif', minWidth: 140 }}>
+              <div style={{ fontFamily: 'serif', minWidth: 160 }}>
                 <p style={{ fontSize: 9, letterSpacing: '0.3em', textTransform: 'uppercase', margin: 0, marginBottom: 4, color: s.status === 'confirmed' ? '#5C7548' : '#8B7355' }}>
                   — {s.status === 'confirmed' ? 'confirmed' : 'draft'}
                 </p>
                 <p style={{ fontSize: 13, color: '#3A2F1F', margin: 0, lineHeight: 1.4, marginBottom: 2 }}>{s.name}</p>
                 {s.nameLocal && (
-                  <p style={{ fontSize: 11, fontStyle: 'italic', color: '#8B7355', margin: 0 }}>{s.nameLocal}</p>
+                  <p style={{ fontSize: 11, fontStyle: 'italic', color: '#8B7355', margin: 0, marginBottom: 8 }}>{s.nameLocal}</p>
                 )}
+                <div style={{ borderTop: '0.5px solid rgba(58,47,31,0.15)', paddingTop: 8, marginTop: 4 }}>
+                  
+                    <a
+                    className="google-maps-popup-link"
+                    href={'https://www.google.com/maps/search/?api=1&query=' + (s.lat as number) + ',' + (s.lng as number)}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    style={{ display: 'block', textAlign: 'center', fontSize: 10, letterSpacing: '0.25em', color: '#8B7355', textTransform: 'uppercase', padding: '4px 0', textDecoration: 'none', fontFamily: 'serif' }}
+                  >
+                    Google マップで開く →
+                  </a>
+                </div>
               </div>
             </Popup>
           </Marker>

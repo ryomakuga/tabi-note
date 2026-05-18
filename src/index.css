@@ -18,3 +18,13 @@ html, body {
 #root {
   min-height: 100vh;
 }
+/* Leaflet を背景に確実に配置(モーダルより下)*/
+.leaflet-container {
+  z-index: 0 !important;
+}
+.leaflet-pane,
+.leaflet-control,
+.leaflet-top,
+.leaflet-bottom {
+  z-index: 1 !important;
+}

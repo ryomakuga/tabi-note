@@ -160,7 +160,76 @@ export function SpotFormModal({ tripId, spot, onClose }: Props) {
           </Field>
 
           <Field label="COORDINATES" labelJa="位置情報(地図ピン用)" optional>
-            <div className="grid grid-cols-2 gap-2 mb-2">
+            {/* ===== ガイド枠 ===== */}
+            <div className="border border-line bg-bg-alt/60 p-5 mb-3">
+              <p className="font-serif italic text-[11px] tracking-[0.2em] text-gold mb-3">
+                — how to set
+              </p>
+              <p className="font-serif-ja text-[12px] text-text leading-relaxed mb-4">
+                かんたん 2 ステップで地図ピンを設定
+              </p>
+
+              {/* STEP 1: Google マップで検索 */}
+              <div className="mb-4">
+                <p className="font-sans text-[9px] tracking-[0.3em] uppercase text-accent mb-2">
+                  — step 01
+                </p>
+                <p className="font-serif-ja text-[12px] text-text mb-2 leading-relaxed">
+                  Google マップで <span className="font-serif italic">{name || 'スポット名'}</span> を検索
+                </p>
+                
+                  <a
+                  href={name.trim() ? 'https://www.google.com/maps/search/' + encodeURIComponent(name.trim()) : '#'}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  onClick={(e) => { if (!name.trim()) e.preventDefault(); }}
+                  className={'maps-search-link inline-block w-full text-center py-3 px-4 font-serif text-[11px] tracking-[0.3em] uppercase transition-colors ' + (name.trim() ? 'bg-text text-bg hover:bg-accent' : 'bg-bg-alt text-text-sub border border-line cursor-not-allowed opacity-60')}
+                >
+                  {name.trim() ? '🗺  Google マップで開く →' : 'スポット名を入力してください'}
+                </a>
+              </div>
+
+              {/* STEP 2: URL をコピーして貼り付け */}
+              <div>
+                <p className="font-sans text-[9px] tracking-[0.3em] uppercase text-accent mb-2">
+                  — step 02
+                </p>
+                <p className="font-serif-ja text-[12px] text-text mb-2 leading-relaxed">
+                  地図ページの URL をコピーしてから、下のボタンをタップ
+                </p>
+                <button
+                  type="button"
+                  onClick={async () => {
+                    setCoordsError(null);
+                    try {
+                      const text = await navigator.clipboard.readText();
+                      const coords = extractCoordsFromMapsUrl(text);
+                      if (coords) {
+                        setLat(String(coords.lat));
+                        setLng(String(coords.lng));
+                      } else {
+                        setCoordsError('クリップボードに Google マップの URL が見つかりません。地図ページの URL をコピーしてからもう一度お試しください。');
+                      }
+                    } catch {
+                      setCoordsError('クリップボードの読み取りに失敗しました');
+                    }
+                  }}
+                  className="w-full py-3 px-4 border-2 border-accent bg-bg text-text font-serif text-[11px] tracking-[0.3em] uppercase hover:bg-accent hover:text-bg transition-colors"
+                >
+                  📋  クリップボードから座標を取得
+                </button>
+              </div>
+
+              {coordsError && (
+                <p className="font-serif-ja text-[11px] text-red-700/80 mt-3 leading-relaxed">{coordsError}</p>
+              )}
+            </div>
+
+            {/* 取得済み座標の表示 / 手動入力 */}
+            <p className="font-serif italic text-[10px] tracking-[0.15em] text-text-sub mb-2">
+              — coordinates(or manual)
+            </p>
+            <div className="grid grid-cols-2 gap-2">
               <input
                 type="text"
                 value={lat}
@@ -178,35 +247,11 @@ export function SpotFormModal({ tripId, spot, onClose }: Props) {
                 inputMode="decimal"
               />
             </div>
-            <div className="flex items-center gap-2">
-              <button
-                type="button"
-                onClick={async () => {
-                  setCoordsError(null);
-                  try {
-                    const text = await navigator.clipboard.readText();
-                    const coords = extractCoordsFromMapsUrl(text);
-                    if (coords) {
-                      setLat(String(coords.lat));
-                      setLng(String(coords.lng));
-                    } else {
-                      setCoordsError('クリップボードから座標を抽出できませんでした。Google マップの URL をコピーしてからお試しください。');
-                    }
-                  } catch {
-                    setCoordsError('クリップボードの読み取りに失敗しました');
-                  }
-                }}
-                className="font-serif italic text-[10px] tracking-[0.2em] text-accent hover:text-text border border-line hover:border-accent px-3 py-1.5 transition-colors"
-              >
-                — Google マップ URL から自動取得 —
-              </button>
-            </div>
-            {coordsError && (
-              <p className="font-serif-ja text-[10px] text-red-700/80 mt-2">{coordsError}</p>
+            {(lat || lng) && (
+              <p className="font-serif italic text-[10px] tracking-[0.05em] text-olive mt-2">
+                ✓ 座標が設定されています
+              </p>
             )}
-            <p className="font-serif-ja text-[10px] text-text-sub/70 mt-2 italic">
-              地図上にピン表示するための座標。Google マップで場所を開いて URL をコピーすれば自動入力できます。
-            </p>
           </Field>
 
           {error && (
