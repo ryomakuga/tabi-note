@@ -243,3 +243,294 @@ TripDetail.tsx への組み込みが残っている。下記の手順で chapter
 - Step 16: F-05b 地図表示(Leaflet + OpenStreetMap)
 - Step 17: F-10 現地語併記
 - Step 18: F-11 オフライン対応
+
+---
+
+## 2026-05-17:Step 15 完了 — F-08 写真ボックス
+
+### Step 15-3: TripDetail への組み込み完了
+
+chapter four(Memories)セクションを TripDetail に追加。コミット 027a415。
+
+### Step 15-bonus: PhotoGalleryModal を独立化
+
+PhotoBoxSection 内の PhotoDetailModal を `PhotoGalleryModal.tsx` として独立コンポーネント化。3 つのビュー(Grid / Timeline / Favorites)に対応:
+
+- **Grid view**: 不均等グリッド、お気に入りに金ドット
+- **Timeline view**: 日付ヘッダー + 写真ロウ(featured + 3-up 等)
+- **Favorites view**: 大判 1 枚ずつ、メタ情報付き + ムービー生成への動線
+
+### Step 15 完成版
+
+- `src/lib/photos-store.ts`(189 行、EXIF 自動ソート)
+- `src/components/PhotoBoxSection.tsx`(295 行)
+- `src/components/PhotoGalleryModal.tsx`(341 行、3 ビュー)
+- TripDetail に Memories セクション組み込み
+
+### コミット
+
+- 33ac58e wip: F-08 写真ボックス Step 15-1,15-2
+- d52db1b docs: Step 15 中間セーブメモ
+- 027a415 feat: F-08 写真ボックス完成、Step 15 完了
+
+### トラブルメモ
+
+- スクショ画像が誤って git に追加された → df3e56a で削除、`.gitignore` 追記(44b731e)
+
+---
+
+## 2026-05-17:Step 16 完了 — F-10 現地語併記強化
+
+### 目的
+
+要件 F-10「現地語併記」を強化。ホテル住所の現地語コピー機能と言語ヘルパー基盤を整備。
+
+### 実装
+
+- `src/lib/languages.ts`(54 行、新規)
+  - 対応言語マップ:vi、ko、th、en、zh-CN、zh-TW、ja
+  - getLanguageName(code): コード → 言語名
+  - getLanguageDirection(code): rtl/ltr 判定の基盤
+- HotelFormModal / 詳細表示
+  - 住所をクリック → 現地語住所をクリップボードにコピー
+  - 「コピーしました」フィードバック表示
+
+### コミット
+
+bc64db0 feat: F-10 現地語併記強化、Step 16 完了
+
+---
+
+## 2026-05-17:Step 17 完了 — データエクスポート/インポート(要件 8.2)
+
+### 目的
+
+要件 8.2「データ消失リスクへの対策」を実装。エクスポート/インポート機能でスマホ故障時の復旧を可能に。
+
+### 実装
+
+- `src/lib/data-export.ts`(212 行、新規)
+  - exportAllData(): trips, travelers, flights, hotels, spots, meals, photos を JSON にまとめてダウンロード
+  - importAllData(file): JSON を読み取って IndexedDB に復元
+  - 写真は Blob → Base64 で変換(IndexedDB の Blob は直接 JSON 化できない)
+  - スキーマバージョン埋め込み(将来の互換性)
+- `src/components/SettingsMenu.tsx`(253 行、新規)
+  - 設定モーダル:エクスポート / インポート / 今すぐロック / PIN 変更 / データ全削除
+  - 危険な操作には確認ダイアログ
+- TripsHome の右上「⋯」から呼び出し
+
+### コミット
+
+572f913 feat: データエクスポート/インポート機能、Step 17 完了(要件 8.2 対策)
+
+---
+
+## 2026-05-17:Step 18 完了 — F-05b 地図表示
+
+### 目的
+
+要件 F-05「観光スポット管理」の地図ビュー実装。スポット・ホテルを Leaflet + OpenStreetMap で地図上にピン表示。
+
+### 実装
+
+#### Step 18-1: パッケージ導入
+`main.tsx` に `import 'leaflet/dist/leaflet.css'` 追加。
+
+#### Step 18-2: SpotMapView 新規作成(186 行)
+
+`src/components/SpotMapView.tsx`:
+
+- MapContainer + TileLayer(OpenStreetMap)+ Marker + Popup
+- カスタムピン:
+  - 確定スポット = 緑(#5C7548)の丸
+  - 候補スポット = 茶(#8B7355)の丸
+  - ホテル = 金(#C49B5C)のひし形
+- FitBoundsToMarkers コンポーネントで自動ズーム
+- デフォルト中心:ダナン市街地 [16.0544, 108.2022]
+- 座標は Spot.lat / lng から、ホテルは mapUrl から正規表現で抽出
+
+#### Step 18-3: SpotFormModal に COORDINATES UI
+
+- 緯度・経度の数値入力フィールド
+- 「Google マップ URL から自動取得」ボタン(クリップボードから)
+- extractCoordsFromMapsUrl():3 パターンの URL に対応
+  - `@lat,lng`
+  - `?q=lat,lng`
+  - `!3dlat!4dlng`
+
+#### Step 18-4: TripDetail に List / Map トグル追加
+
+Places セクションに List / Map 切替を追加(`spotView: 'list' | 'map'`)。
+
+### コミット
+
+8d793e4 feat: F-05b 地図表示完成、Step 18 完了(Leaflet + OpenStreetMap でスポット地図ビュー)
+
+### トラブルメモ
+
+- **react-leaflet@4 と React 19 の peer 不一致** → v5 で解決
+- **zsh の `==`/`#` 詰まり問題が頻発** → クォート付きヒアドキュメント `<<'TAB_END'` で全部リテラル化
+- **chr(60) 戦法**:cat ヒアドキュメントで `<a` タグが消える → `chr(60) + 'a'` で動的構築(回避策)
+
+---
+
+## 2026-05-17:Step 18-bonus 完了 — Popup 改善 + Leaflet z-index 修正
+
+### 目的
+
+Step 18 完了後の UX 改善 3 点。
+
+### 1. COORDINATES UI を 2 ステップガイドに改善
+
+SpotFormModal の座標入力欄を、ガイド枠付きの 2 ステップ UI に再設計:
+
+- **STEP 01**: 「Google マップで {name} を検索」(name から動的 URL 生成、bg-text text-bg の目立つボタン)
+- **STEP 02**: 「クリップボードから座標を取得」(border-2 border-accent の枠線強調ボタン)
+- 「✓ 座標が設定されています」olive 色フィードバック
+- 手動入力は「— coordinates(or manual)」として格下げ
+
+### 2. Popup に Google マップリンク追加(Option B 採用)
+
+ピンクリックで Popup のみ表示(編集モーダルは開かない)。Popup 内に「Google マップで開く →」リンク:
+
+- URL: `https://www.google.com/maps/search/?api=1&query={lat},{lng}`
+- スポット用は茶色(#8B7355)、ホテル用は金色(#C49B5C)
+
+### 3. Leaflet z-index 問題修正
+
+Leaflet のデフォルト z-index(400〜700)がモーダル(z-50)を覆い隠す問題。`src/index.css` 末尾に追記:
+
+```css
+.leaflet-container { z-index: 0 !important; }
+.leaflet-pane, .leaflet-control, .leaflet-top, .leaflet-bottom { z-index: 1 !important; }
+```
+
+### コミット
+
+9decdac feat: Popup に Google マップリンク + Leaflet z-index 修正(モーダル背面に配置)
+
+### トラブルメモ:`<a` タグ消失問題
+
+cat ヒアドキュメントを Python で処理中、`<a` タグの開始だけが消失する問題が複数回発生(SpotFormModal、SpotMapView の 2 ファイル合計 3 箇所)。
+
+**対処パッチ:**
+
+```python
+# href= がある行の手前に <a を再挿入するパッチ
+for line in lines:
+    if 'href={...maps/search...' in line:
+        prev = lines[i-1]
+        if '<a' not in prev:
+            lines.insert(i, indent + '<a\n')
+```
+
+検出パターン: `grep -cE "^\s*<a$" file.tsx` でカウント。
+
+---
+
+## 2026-05-18:Step 19 完了 — 地図に食事ピン統合
+
+### 目的
+
+Places の地図ビューに食事(Meal)のピンも表示できるようにする。「五行山の近くで食事できる店」が一目で分かる体験を実現。
+
+### 設計判断
+
+**Option A: 統合 + フィルタ付き** を採用(将来 Step 19-3 で All/Places/Meals フィルタを追加予定)。
+
+**食事ピン色:** テラコッタ橙(#C97C5D)の四角(12×12px)
+- 既存の緑(確定スポット)・茶(候補)・金ひし形(ホテル)とぶつからない暖色
+- 四角はプレート(食器)のイメージで食事と直感的に結びつく
+
+### Step 19-1: Meal 型 + COORDINATES UI
+
+- `types.ts`: Meal に `lat?: number` `lng?: number` を追加(後方互換)
+- `MealFormModal.tsx`(313 → 421 行):
+  - useState で lat, lng, coordsError を追加
+  - handleSubmit data に lat/lng 追加
+  - extractCoordsFromMapsUrl ヘルパー(SpotFormModal と同じパターン)
+  - COORDINATES フィールドを MAP URL の直後に挿入(2 ステップ UI)
+
+コミット:a7b090d
+
+### Step 19-2: SpotMapView に Meals 対応
+
+`SpotMapView.tsx`(186 → 244 行):
+
+- import に Meal 型追加
+- mealIcon を定義(`#C97C5D` 四角)
+- Props に `meals?: Meal[]` と `onMealClick?` 追加
+- mealsWithCoords を計算(座標がある meal だけフィルタ)
+- FitBoundsToMarkers に meals 渡し(全ピンが収まる自動ズーム)
+- Marker レンダリングに meals を追加、Popup に Google マップリンク
+
+Popup の表示内容:
+### Step 19-4: TripDetail から meals を渡す
+
+```tsx
+<SpotMapView
+  spots={...}
+  hotels={...}
+  meals={allMeals.filter((m) => m.tripId === trip.id)}
+  onSpotClick={...}
+  onMealClick={(m) => { setEditingMeal(m); setIsMealModalOpen(true); }}
+/>
+```
+
+### コミット
+
+- a7b090d feat: Meal 型に lat/lng 追加 + MealFormModal に COORDINATES UI(Step 19-1)
+- b6a0c17 feat: 地図に食事ピン追加(テラコッタ橙の四角)+ Popup から Google マップへ(Step 19-2/19-4)
+
+### 動作確認(2026-05-18)
+
+ダナンの旅でマダムラン(16.0814, 108.2232)を登録し、地図にテラコッタ橙の四角ピンが表示されることを確認 ✅
+- ピンクリックで Popup 表示
+- 「Google マップで開く →」で Google Maps が起動
+- スポット(緑)+ ホテル(金ひし形)+ 食事(橙四角)の 3 種共存
+
+### トラブルメモ
+
+#### Vite ポート競合(5173 vs 5174)
+
+開発中に何度か Vite を kill/restart した結果、5173 番ポートが解放されないまま 5174 に逃げる事態が発生。IndexedDB は **ポート単位で別ストレージ** のため、5174 でアクセスすると「空のアプリ」に見えてデータ消失と勘違いしやすい。
+
+**対処:**
+```bash
+lsof -ti:5173 | xargs kill -9
+lsof -ti:5174 | xargs kill -9
+sleep 2
+npm run dev  # 5173 で起動
+```
+
+#### `<a` タグ消失問題(再発)
+
+Step 19-1(MealFormModal)、Step 19-2(SpotMapView)で再発。同じ Python パッチで `<a` 復活で全て対処済み。
+
+### Step 19 後の地図ビュー
+
+| ピン | 色 | 形 | 対象 |
+|------|-----|-----|------|
+| 🟢 | #5C7548 | 丸 | 確定スポット |
+| 🟤 | #8B7355 | 丸 | 候補スポット |
+| 🟡 | #C49B5C | ひし形 | ホテル |
+| 🟧 | #C97C5D | 四角 | 食事 |
+
+### Phase 進捗
+
+- Phase 1:✅ 完了
+- Phase 2:✅ フィナーレ達成
+- Phase 3:🔄 進行中
+  - ✅ F-08 写真ボックス(Step 15)
+  - ✅ F-10 現地語併記(Step 16)
+  - ✅ データ消失対策(Step 17)
+  - ✅ F-05b 地図表示(Step 18 + 18-bonus + 19)
+  - ⏳ F-11 オフライン対応(PWA)
+
+### 次回の選択肢
+
+- A. F-11 PWA オフライン対応(旅行中の電波弱対策、必須機能)
+- B. Step 19-3 フィルタタブ(All / Places / Meals)
+- C. Phase 4 へ:F-12 共同編集・F-13 共有用 PIN
+
+出発まで:あと 41 日
