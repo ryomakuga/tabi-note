@@ -12,6 +12,7 @@ import { useSpotsStore } from '../lib/spots-store';
 import { useMealsStore } from '../lib/meals-store';
 import { useHotelsStore } from '../lib/hotels-store';
 import { TripFormModal } from './TripFormModal';
+import { ShareModal } from './ShareModal';
 import { ExternalLink } from './ExternalLink';
 import { getTimezoneOffsetText } from '../lib/timezones';
 import type { Flight, Hotel, Spot, Meal } from '../lib/types';
@@ -40,6 +41,7 @@ export function TripDetail() {
   const [editingMeal, setEditingMeal] = useState<Meal | undefined>(undefined);
   const [mealFilter, setMealFilter] = useState<'all' | 'draft' | 'confirmed'>('all');
   const [isTripEditOpen, setIsTripEditOpen] = useState(false);
+  const [isShareModalOpen, setIsShareModalOpen] = useState(false);
 
   useEffect(() => {
     if (selectedTripId) loadFlights(selectedTripId);
@@ -79,6 +81,7 @@ export function TripDetail() {
       <div className="max-w-md mx-auto px-7 pt-14">
         <div className="flex items-center justify-between mb-8">
           <button onClick={closeTrip} className="font-serif italic text-text-sub text-sm tracking-[0.15em] hover:text-text transition-colors">← back to trips</button>
+          <button onClick={() => setIsShareModalOpen(true)} className="font-serif italic text-text-sub text-sm tracking-[0.15em] hover:text-text transition-colors mr-4">share ⌁</button>
           <button onClick={() => setIsTripEditOpen(true)} className="font-serif italic text-text-sub text-sm tracking-[0.15em] hover:text-text transition-colors">edit ✎</button>
         </div>
 
@@ -205,6 +208,9 @@ export function TripDetail() {
 
       {isFlightModalOpen && (
         <FlightFormModal tripId={trip.id} flight={editingFlight} onClose={() => { setIsFlightModalOpen(false); setEditingFlight(undefined); }} />
+      )}
+      {isShareModalOpen && (
+        <ShareModal tripId={trip.id} tripTitle={trip.title} onClose={() => setIsShareModalOpen(false)} />
       )}
       {isTripEditOpen && (
         <TripFormModal trip={trip} onClose={() => setIsTripEditOpen(false)} />
