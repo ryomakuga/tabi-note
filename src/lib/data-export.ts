@@ -244,7 +244,7 @@ export async function encryptShareData(
   const json = JSON.stringify(data);
   const encrypted = await encrypt(json, sharePin);
   const payload = JSON.stringify(encrypted);
-  return base64ToBase64Url(btoa(payload));
+  return bytesToBase64Url(stringToBytes(payload));
 }
 
 export function buildShareUrl(encryptedPayload: string): string {
@@ -266,8 +266,7 @@ export async function decryptShareData(
   payload: string,
   sharePin: string
 ): Promise<ShareData> {
-  const base64 = base64UrlToBase64(payload);
-  const json = atob(base64);
+  const json = bytesToString(base64UrlToBytes(payload));
   const encrypted = JSON.parse(json) as EncryptedData;
   const decryptedJson = await decrypt(encrypted, sharePin);
   const data = JSON.parse(decryptedJson) as unknown;
@@ -282,17 +281,6 @@ export function extractSharePayloadFromUrl(url: string): string | null {
   return match ? match[1] : null;
 }
 
-function base64ToBase64Url(base64: string): string {
-  return base64.replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
-}
-
-function base64UrlToBase64(base64url: string): string {
-  let base64 = base64url.replace(/-/g, '+').replace(/_/g, '/');
-  while (base64.length % 4 !== 0) {
-    base64 += '=';
-  }
-  return base64;
-}
 
 function validateShareData(data: unknown): data is ShareData {
   if (!data || typeof data !== 'object') return false;
@@ -385,4 +373,39 @@ export async function importShareData(data: ShareData): Promise<ShareImportResul
     spotsCount: newSpots.length,
     mealsCount: newMeals.length,
   };
+}
+
+function base64ToBytes(base64: string): Uint8Array {
+  const binary = atob(base64);
+  const bytes = new Uint8Array(binary.length);
+  for (let i = 0; i < binary.length; i++) {
+    bytes[i] = binary.charCodeAt(i);
+  }
+  return bytes;
+}
+
+function bytesToBase64(bytes: Uint8Array): string {
+  let binary = '';
+  for (let i = 0; i < bytes.length; i++) {
+    binary += String.fromCharCode(bytes[i]);
+  }
+  return btoa(binary);
+}
+
+function bytesToBase64Url(bytes: Uint8Array): string {
+  return bytesToBase64(bytes).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
+}
+
+function base64UrlToBytes(base64url: string): Uint8Array {
+  let base64 = base64url.replace(/-/g, '+').replace(/_/g, '/');
+  while (base64.length % 4) base64 += '=';
+  return base64ToBytes(base64);
+}
+
+function stringToBytes(str: string): Uint8Array {
+  return new TextEncoder().encode(str);
+}
+
+function bytesToString(bytes: Uint8Array): string {
+  return new TextDecoder().decode(bytes);
 }

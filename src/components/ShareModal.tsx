@@ -1,9 +1,9 @@
 // ============================================
 // Tabi Note - 共有モーダル(F-12)
+// URLコピー方式(QRは非対応)
 // ============================================
 
 import { useState } from 'react';
-import QRCode from 'qrcode';
 import { generateShareUrl } from '../lib/data-export';
 
 interface ShareModalProps {
@@ -19,8 +19,6 @@ export function ShareModal({ tripId, tripTitle, onClose }: ShareModalProps) {
   const [pin1, setPin1] = useState('');
   const [pin2, setPin2] = useState('');
   const [shareUrl, setShareUrl] = useState('');
-  const [qrDataUrl, setQrDataUrl] = useState('');
-  const [qrUnavailable, setQrUnavailable] = useState(false);
   const [error, setError] = useState('');
   const [busy, setBusy] = useState(false);
   const [copied, setCopied] = useState(false);
@@ -36,21 +34,9 @@ export function ShareModal({ tripId, tripTitle, onClose }: ShareModalProps) {
       return;
     }
     setBusy(true);
-    setQrUnavailable(false);
     try {
       const { url } = await generateShareUrl(tripId, pin1);
       setShareUrl(url);
-      try {
-        const qr = await QRCode.toDataURL(url, {
-          margin: 2,
-          width: 280,
-          errorCorrectionLevel: 'L',
-          color: { dark: '#3A2F1F', light: '#ECE5D8' },
-        });
-        setQrDataUrl(qr);
-      } catch {
-        setQrUnavailable(true);
-      }
       setStage('result');
     } catch (e) {
       setError(e instanceof Error ? e.message : '共有URLの生成に失敗しました。');
@@ -101,9 +87,7 @@ export function ShareModal({ tripId, tripTitle, onClose }: ShareModalProps) {
           )}
           {stage === 'result' && (
             <>
-              <p className="font-serif-ja text-text text-sm leading-relaxed mb-5 tracking-wider">共有URLを生成しました。<br /><span className="text-text-sub text-xs">PINは別の手段(LINEなど)で送ってください。</span></p>
-              {qrDataUrl && (<div className="flex justify-center mb-6"><img src={qrDataUrl} alt="共有用QRコード" className="border border-line" /></div>)}
-              {qrUnavailable && (<div className="mb-6 px-4 py-3 bg-bg-alt border border-line text-center"><p className="font-serif italic text-text-sub text-xs tracking-wider">— データが大きいため QR は省略 —</p><p className="font-serif-ja text-text-sub text-xs mt-1 tracking-wider">URL をコピーしてお送りください</p></div>)}
+              <p className="font-serif-ja text-text text-sm leading-relaxed mb-5 tracking-wider">共有URLを生成しました。<br /><span className="text-text-sub text-xs">URLをLINEなどで送り、PINは別の手段でお伝えください。</span></p>
               <div className="mb-4">
                 <label className="font-sans text-xs tracking-[0.3em] text-accent uppercase block mb-2">Share URL</label>
                 <div className="bg-bg-alt border border-line p-3 max-h-32 overflow-y-auto break-all font-mono text-xs text-text">{shareUrl}</div>
