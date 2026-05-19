@@ -784,3 +784,37 @@ DevTools Application タブから手動で削除(右クリック → Delete):
 - 旅費・予算管理機能(要件 11.2)
 
 出発まで:あと 40 日
+
+---
+
+## Step 23:実機テスト準備 - HTTPS化(2026/05/20 深夜)
+
+### 経緯
+C 実機テスト案で、iPhone Safari から http://192.168.0.222:5174 にアクセスしたところ、PIN 入力後に画面が止まる症状。LockScreen に try-catch を仕込んでエラーを画面表示させた結果「TypeError: undefined is not an object (evaluating crypto.subtle.importKey)」を確認。
+
+### 原因
+Safari は LAN IP の http:// を Insecure Context と判定し、Web Crypto API(crypto.subtle)を提供しない仕様。localhost は例外だが 192.168.x.x は許可されない。iOS の Chrome も中身は WebKit のため同じ制約を受ける(Apple の方針)。
+
+### 解決:Vite を HTTPS で起動
+- @vitejs/plugin-basic-ssl を導入
+- vite.config.ts に basicSsl() プラグインを追加
+- npm run dev -- --host で起動すると https://192.168.0.222:5173 で公開される
+- iPhone Safari/Chrome では「証明書エラー → 詳細設定 → アクセス」で通過
+
+### 成果
+- iPhone Safari で https:// 経由でアクセス成功
+- PIN 初期設定が正常に動作することを確認
+- 実機テスト環境の確立
+
+### 学び
+- LAN 開発で WebAuthn / Web Crypto / Service Worker 等 Secure Context 限定 API を使うなら HTTPS 必須
+- 自己署名証明書は warning が出るが開発用途では問題なし
+- iOS では Chrome ≠ Chromium、すべて WebKit(Safari の制約を受ける)
+
+### 未完了タスク
+- iPhone PWA インストール(ホーム画面に追加)
+- 実機での触り心地レビュー(タップ・スクロール・片手操作・文字サイズ)
+- iPhone 側で共有URL受信フルサイクル
+- LockScreen の try-catch エラー表示は debugging 用なのでいずれクリーンアップ
+
+出発まで:あと 40 日

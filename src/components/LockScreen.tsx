@@ -28,19 +28,25 @@ export function LockScreen() {
   const handleSubmit = async () => {
     if (isLockedOut) return;
 
-    if (!isPinSet) {
-      await setupPin(pin);
-      return;
-    }
+    try {
+      if (!isPinSet) {
+        await setupPin(pin);
+        return;
+      }
 
-    const success = await unlock(pin);
-    if (!success) {
-      setError(`PINが正しくありません(${failedAttempts + 1}/5)`);
-      setIsShaking(true);
-      setTimeout(() => {
-        setPin('');
-        setIsShaking(false);
-      }, 600);
+      const success = await unlock(pin);
+      if (!success) {
+        setError(`PINが正しくありません(${failedAttempts + 1}/5)`);
+        setIsShaking(true);
+        setTimeout(() => {
+          setPin('');
+          setIsShaking(false);
+        }, 600);
+      }
+    } catch (e) {
+      const msg = e instanceof Error ? `${e.name}: ${e.message}` : String(e);
+      setError(`ERROR: ${msg}`);
+      setPin('');
     }
   };
 
