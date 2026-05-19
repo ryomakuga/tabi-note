@@ -712,3 +712,75 @@ Tabi Note を PWA(Progressive Web App)として動作させる対応を完了。
 - D. 実機テスト(iPhone PWA インストール + 共有URL受信)
 
 出発まで:あと 40 日
+
+---
+
+## Step 22:QR撤退・色変更B・DBクリーンアップ(2026/05/19 夜)
+
+### 22-1:QRコード対応、撤退の判断
+
+F-12 共有機能で「URL を QR で渡したい」要望に対して、QR上限 2,953文字に対しデータが 4,200〜5,900文字となり収まらず。
+
+試したこと:
+- LZ-String 圧縮(`compressToBase64` / `compressToEncodedURIComponent` / `compressToUint8Array` 各種)
+- 暗号化結果のバイナリ連結(`[salt|iv|ct]` 形式)
+- QR Version 40 + Error Correction L
+
+結果:LZ-String の圧縮率がたった 1.2%(3,121字 → 3,084字)で頭打ち。原因はデータ中身が UUID・ISO日時・座標など高エントロピー文字列で、辞書圧縮が効かないため。
+
+撤退の判断:
+- 要件定義書 3.13 で「LINE で URL+PIN を別々に送る」が推奨運用と明記
+- QR は補助機能で、必須ではない
+- データ構造の根本リファクタが必要だが、出発まで40日では ROI が低い
+
+実施:
+- ShareModal から `qrcode` ライブラリ依存を撤去
+- `data-export.ts` から `lz-string` 依存を撤去
+- 暗号化フローを「JSON → encrypt → JSON.stringify → bytesToBase64Url」のシンプル形に戻す
+- UI を「URL コピー専用」に統一(「データが大きいため QR は省略」メッセージも撤去)
+- npm から `qrcode` `@types/qrcode` `lz-string` `@types/lz-string` を削除
+- コミット `8f13f90`(40行追加 / 342行削除)
+- precache 652 KiB → 624 KiB
+
+### 22-2:Pattern B 色変更(可読性向上)
+
+3パターン(A=現状、B=濃いめ、C=濃い+大きい)を比較ページで提示し、B を採用。
+
+`tailwind.config.js`:
+- `text`: #3A2F1F → #2A2218
+- `text-sub`: #8B7355 → #4A3A28
+- `accent`: #8B7355 → #4A3A28
+- `gold`: #C49B5C → #8B6420
+- `line` 不透明度: 0.15 → 0.35
+- `line-strong` 不透明度: 0.3 → 0.5
+
+コミット `0344b9c`
+
+### 22-3:DB クリーンアップ(ダナンの旅 3つ → 1つ)
+
+過去のセッションで同じ「ダナンの旅」を3回作成していた状態。写真12枚は `597c0f0e-...` Trip にのみ紐付き、他2つ(`02960186-...` / `c8e3875e-...`)には付随データだけ残存。Memories 開いて「写真が見つからない」と気付いた。
+
+DevTools Application タブから手動で削除(右クリック → Delete):
+- spots: 6件 → 2件(五行山 + バーナーヒルズ)
+- hotels: 3件 → 1件(シェラトン)
+- meals: 3件 → 1件(マダムラン)
+- trips: 3件 → 1件(`597c0f0e-...` のみ)
+
+途中ミス:flights テーブルで「ゴミ箱アイコン」を押したら **テーブル全消し(Clear object store)** で6件すべて消えた。**「ゴミ箱アイコンは選択行ではなくテーブル全削除」** を学習。以降は右クリック → Delete で1件ずつ確実に削除する手順に変更。
+
+復旧:UIから往路 VN337 + 復路 VN336 を手動再入力(要件定義書 A.2 の情報通り)。
+
+### 学び・今後の運用
+
+- IndexedDB の DevTools 操作:**ゴミ箱アイコンは全消し**、**右クリック Delete が個別削除**
+- 共有データの根本最適化(UUID短縮・キー名短縮)は出発後に検討
+- 色は Pattern B が最終決定、フォント太さは現状(300/400)維持
+
+### 次回の選択肢
+
+- 重複インポート防止(`sourceTripId` で同一旅の検出)
+- フィルタタブ(Schedule内の表示切替)
+- 実機テスト(iPhone PWA + 共有URL受信)
+- 旅費・予算管理機能(要件 11.2)
+
+出発まで:あと 40 日
