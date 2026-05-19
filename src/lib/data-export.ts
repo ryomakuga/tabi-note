@@ -308,3 +308,81 @@ function validateShareData(data: unknown): data is ShareData {
     Array.isArray(d.meals)
   );
 }
+
+/* ═══════════════════════════════════════════
+   共有データのインポート(F-12 受信側)
+   - URL から復号した ShareData を自分のデバイスに保存
+   - 既存データと衝突しないよう新しい ID を発行して追加
+═══════════════════════════════════════════ */
+
+export interface ShareImportResult {
+  tripTitle: string;
+  destination: string;
+  flightsCount: number;
+  hotelsCount: number;
+  spotsCount: number;
+  mealsCount: number;
+}
+
+/**
+ * ShareData を自分のデバイスにインポート
+ * - Trip / Flight / Hotel / Spot / Meal すべてに新しい ID を発行
+ * - 既存の旅と並列に追加(置き換えはしない)
+ */
+export async function importShareData(data: ShareData): Promise<ShareImportResult> {
+  // 新しい Trip ID を生成
+  const newTripId = crypto.randomUUID();
+
+  const now = new Date().toISOString();
+
+  // Trip を新 ID で複製
+  const newTrip: Trip = {
+    ...data.trip,
+    id: newTripId,
+    createdAt: now,
+    updatedAt: now,
+  };
+
+  // 関連データも新 ID + tripId を貼り替え
+  const newFlights: Flight[] = data.flights.map((f) => ({
+    ...f,
+    id: crypto.randomUUID(),
+    tripId: newTripId,
+  }));
+
+  const newHotels: Hotel[] = data.hotels.map((h) => ({
+    ...h,
+    id: crypto.randomUUID(),
+    tripId: newTripId,
+  }));
+
+  const newSpots: Spot[] = data.spots.map((s) => ({
+    ...s,
+    id: crypto.randomUUID(),
+    tripId: newTripId,
+  }));
+
+  const newMeals: Meal[] = data.meals.map((m) => ({
+    ...m,
+    id: crypto.randomUUID(),
+    tripId: newTripId,
+  }));
+
+  // トランザクションで一括追加
+  await db.transaction('rw', [db.trips, db.flights, db.hotels, db.spots, db.meals], async () => {
+    await db.trips.add(newTrip);
+    if (newFlights.length > 0) await db.flights.bulkAdd(newFlights);
+    if (newHotels.length > 0) await db.hotels.bulkAdd(newHotels);
+    if (newSpots.length > 0) await db.spots.bulkAdd(newSpots);
+    if (newMeals.length > 0) await db.meals.bulkAdd(newMeals);
+  });
+
+  return {
+    tripTitle: newTrip.title,
+    destination: newTrip.destination,
+    flightsCount: newFlights.length,
+    hotelsCount: newHotels.length,
+    spotsCount: newSpots.length,
+    mealsCount: newMeals.length,
+  };
+}
