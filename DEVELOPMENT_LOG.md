@@ -591,3 +591,59 @@ Tabi Note を PWA(Progressive Web App)として動作させる対応を完了。
 - C. GitHub にリモートリポジトリを作って push(クラウドバックアップ)
 
 出発まで:あと 41 日
+
+---
+
+## Step 21:F-12 共同編集 前半(2026/05/19)
+
+### 概要
+
+要件定義書 3.13・9.4 に基づく共有機能の送信側を実装。同行者に旅データを暗号化URLで渡せるところまで完了。受信側(Step 21-4)は次回。
+
+### 実施内容
+
+**前準備**
+- GitHub に Private リポジトリ `ryomakuga/tabi-note` を作成
+- 17 コミット分を `git push -u origin main` でクラウドへ保護
+- git の `user.email` を no-reply アドレス `283587669+ryomakuga@users.noreply.github.com` に整備
+
+**Step 21-0:ライブラリ追加**
+- `qrcode` + `@types/qrcode`
+
+**Step 21-2:共有用エクスポート(`data-export.ts`)**
+- `ShareData` 型(1旅行分、写真除外)
+- `buildShareData(tripId)` で対象旅行のデータを集める
+- `encryptShareData(data, sharePin)` で AES-256-GCM 暗号化 → Base64URL
+- `buildShareUrl()` で `<origin>/#share=...` 形式に整形
+- `generateShareUrl(tripId, sharePin)` で一発生成
+- `decryptShareData(payload, sharePin)` で復号(受信側で使う)
+- `extractSharePayloadFromUrl(url)` で URL からペイロード抽出
+
+**Step 21-3a:共有モーダル(`ShareModal.tsx`)**
+- 共有用PIN を2回入力 → URL 生成
+- QR コード生成(errorCorrectionLevel: L)
+- データ大きい場合は QR 省略 + URL コピーのみ表示
+- Kinfolk トーンで仕上げ
+
+**Step 21-3b:TripDetail に統合**
+- ヘッダーに `share ⌁` ボタン追加(`edit ✎` の左)
+- モーダル表示の state を管理
+
+### 成果
+
+- コミット `dba2251` `835b8f5` `9ec1332`(累計 20 コミット)
+- 動作確認:ダナンの旅で URL 生成 → コピー成功
+
+### 既知の課題
+
+- 共有データが大きいと QR コード生成不可(今は URL コピーのみで運用)
+- 圧縮対応(LZ-String 等)は将来検討
+
+### 次回の選択肢
+
+- A. Step 21-4 共有データ受信側(URL を開く → PIN 入力 → 自分のデバイスにインポート)
+- B. Step 21-5 URL ルーティング(`#share=...` を自動検出して受信モーダル起動)
+- C. Step 21-6 実機テスト(2台で送受信)
+- D. データ圧縮(LZ-String 導入で QR 復活)
+
+出発まで:あと 40 日
