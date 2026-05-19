@@ -647,3 +647,68 @@ Tabi Note を PWA(Progressive Web App)として動作させる対応を完了。
 - D. データ圧縮(LZ-String 導入で QR 復活)
 
 出発まで:あと 40 日
+
+---
+
+## Step 21:F-12 共同編集 完成(2026/05/19 続き)
+
+### 概要
+
+要件定義書 3.13・9.4 の F-12 共同編集・データ共有を、送信側と受信側ともに完成。1台のデバイスで「共有URL生成 → 別タブでURL貼り付け → 復号 → プレビュー → インポート → Trips Home に追加」のフルサイクルが動作することを確認。
+
+### Step 21-4:受信側ロジック(`data-export.ts`)
+
+- `ShareImportResult` 型
+- `importShareData(data)` で ShareData を自分のデバイスにインポート
+  - Trip 含む全エンティティに新しい UUID を発行(既存と衝突しない)
+  - tripId を貼り替えて Flight/Hotel/Spot/Meal を関連付け直し
+  - トランザクションで一括追加
+
+### Step 21-4:受信モーダル(`ReceiveModal.tsx`)
+
+- 3ステージ:`input` → `preview` → `done`
+- URL textarea + Share PIN 入力
+- 復号後にプレビュー(行き先・タイトル・期間・件数)
+- インポート完了画面で Kinfolk トーンに装飾
+
+### Step 21-4c:Trips Home に統合
+
+- 通常状態:「+ Begin a new journey」の直下に「— receive a journey — / 同行者から旅を受け取る」
+- 空状態:「Begin」ボタンの下に控えめなテキストリンク
+
+### Step 21-5:URL ハッシュ自動起動
+
+- `window.location.hash.startsWith('#share=')` を検出
+- 自動で `ReceiveModal` を起動(URL 欄に初期値セット済み)
+- `history.replaceState` で URL をクリーンアップ(再リロードで再起動しない)
+
+### 成果
+
+- コミット `9109590`(累計 22 コミット)
+- 同一ブラウザの別タブで送受信フルサイクル動作確認済み
+- 「ダナンの旅」が2つ並ぶ状態(オリジナル + インポート版)
+
+### 動作確認の流れ(再現手順)
+
+1. ダナンの旅を開く → share ⌁ → 共有PIN `1234` → Generate
+2. URL コピー
+3. 新しいタブで URL を貼り付け
+4. アプリPINで解錠後、自動で受信モーダル起動(URL 欄に貼り付け済み)
+5. 共有PIN `1234` → Decrypt → プレビュー表示
+6. Import → 「旅を受け取りました」表示
+7. Done → Trips Home にダナンの旅が2つ(複製インポート完了)
+
+### 既知の制約
+
+- 共有データが2KBを超えると QR コード不可(URL コピーのみで運用)
+- 同じ旅を複数回 import すると重複登録される(将来:重複検出ダイアログ?)
+- 受信時の「すでに同じ旅がある」検出はなし(現状は常に新規追加)
+
+### 次回の選択肢
+
+- A. データ圧縮(LZ-String 導入で QR コード復活)
+- B. 重複インポート防止(`exportedAt` または Trip 起源ID で検出)
+- C. Step 19-3 フィルタタブ(All / Places / Meals)
+- D. 実機テスト(iPhone PWA インストール + 共有URL受信)
+
+出発まで:あと 40 日
