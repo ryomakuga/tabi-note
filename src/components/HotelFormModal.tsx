@@ -9,6 +9,18 @@ interface Props {
   onClose: () => void;
 }
 
+// Google マップの URL から座標を抽出
+function extractCoordsFromMapsUrl(url: string): { lat: number; lng: number } | null {
+  if (!url) return null;
+  let m = url.match(/@(-?\d+\.\d+),(-?\d+\.\d+)/);
+  if (m) return { lat: parseFloat(m[1]), lng: parseFloat(m[2]) };
+  m = url.match(/[?&]q=(-?\d+\.\d+),(-?\d+\.\d+)/);
+  if (m) return { lat: parseFloat(m[1]), lng: parseFloat(m[2]) };
+  m = url.match(/!3d(-?\d+\.\d+)!4d(-?\d+\.\d+)/);
+  if (m) return { lat: parseFloat(m[1]), lng: parseFloat(m[2]) };
+  return null;
+}
+
 export function HotelFormModal({ tripId, hotel, onClose }: Props) {
   const isEdit = !!hotel;
   const createHotel = useHotelsStore((s) => s.createHotel);
@@ -21,6 +33,9 @@ export function HotelFormModal({ tripId, hotel, onClose }: Props) {
   const [checkIn, setCheckIn] = useState(toDatetimeLocal(hotel?.checkIn));
   const [checkOut, setCheckOut] = useState(toDatetimeLocal(hotel?.checkOut));
   const [mapUrl, setMapUrl] = useState(hotel?.mapUrl ?? '');
+  const [lat, setLat] = useState<string>(hotel?.lat != null ? String(hotel.lat) : '');
+  const [lng, setLng] = useState<string>(hotel?.lng != null ? String(hotel.lng) : '');
+  const [coordsError, setCoordsError] = useState<string | null>(null);
   const [urls, setUrls] = useState<string[]>(hotel?.urls ?? []);
   const [phone, setPhone] = useState(hotel?.phone ?? '');
   const [error, setError] = useState<string | null>(null);
@@ -43,6 +58,8 @@ export function HotelFormModal({ tripId, hotel, onClose }: Props) {
         checkIn: fromDatetimeLocal(checkIn),
         checkOut: fromDatetimeLocal(checkOut),
         mapUrl: mapUrl.trim() || undefined,
+        lat: lat ? parseFloat(lat) : undefined,
+        lng: lng ? parseFloat(lng) : undefined,
         urls: urls.length > 0 ? urls : undefined,
         phone: phone.trim() || undefined,
       };
@@ -142,6 +159,98 @@ export function HotelFormModal({ tripId, hotel, onClose }: Props) {
               className="form-input"
               placeholder="https://maps.google.com/..."
             />
+          </Field>
+
+          <Field label="COORDINATES" labelJa="位置情報(地図ピン用)" optional>
+            <div className="border border-line bg-bg-alt/60 p-5 mb-3">
+              <p className="font-serif italic text-[11px] tracking-[0.2em] text-gold mb-3">
+                — how to set
+              </p>
+              <p className="font-serif-ja text-[12px] text-text leading-relaxed mb-4">
+                かんたん 2 ステップで地図ピンを設定
+              </p>
+
+              <div className="mb-4">
+                <p className="font-sans text-[9px] tracking-[0.3em] uppercase text-accent mb-2">
+                  — step 01
+                </p>
+                <p className="font-serif-ja text-[12px] text-text mb-2 leading-relaxed">
+                  Google マップで <span className="font-serif italic">{name || 'ホテル名'}</span> を検索
+                </p>
+                
+                  <a
+                
+                  href={name.trim() ? 'https://www.google.com/maps/search/' + encodeURIComponent(name.trim()) : '#'}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  onClick={(e) => { if (!name.trim()) e.preventDefault(); }}
+                  className={'maps-search-link inline-block w-full text-center py-3 px-4 font-serif text-[11px] tracking-[0.3em] uppercase transition-colors ' + (name.trim() ? 'bg-text text-bg hover:bg-accent' : 'bg-bg-alt text-text-sub border border-line cursor-not-allowed opacity-60')}
+                >
+                  {name.trim() ? '🗺  Google マップで開く →' : 'ホテル名を入力してください'}
+                </a>
+              </div>
+
+              <div>
+                <p className="font-sans text-[9px] tracking-[0.3em] uppercase text-accent mb-2">
+                  — step 02
+                </p>
+                <p className="font-serif-ja text-[12px] text-text mb-2 leading-relaxed">
+                  地図ページの URL をコピーしてから、下のボタンをタップ
+                </p>
+                <button
+                  type="button"
+                  onClick={async () => {
+                    setCoordsError(null);
+                    try {
+                      const text = await navigator.clipboard.readText();
+                      const coords = extractCoordsFromMapsUrl(text);
+                      if (coords) {
+                        setLat(String(coords.lat));
+                        setLng(String(coords.lng));
+                      } else {
+                        setCoordsError('クリップボードに Google マップの URL が見つかりません。地図ページの URL をコピーしてからもう一度お試しください。');
+                      }
+                    } catch {
+                      setCoordsError('クリップボードの読み取りに失敗しました');
+                    }
+                  }}
+                  className="w-full py-3 px-4 border-2 border-accent bg-bg text-text font-serif text-[11px] tracking-[0.3em] uppercase hover:bg-accent hover:text-bg transition-colors"
+                >
+                  📋  クリップボードから座標を取得
+                </button>
+              </div>
+
+              {coordsError && (
+                <p className="font-serif-ja text-[11px] text-red-700/80 mt-3 leading-relaxed">{coordsError}</p>
+              )}
+            </div>
+
+            <p className="font-serif italic text-[10px] tracking-[0.15em] text-text-sub mb-2">
+              — coordinates(or manual)
+            </p>
+            <div className="grid grid-cols-2 gap-2">
+              <input
+                type="text"
+                value={lat}
+                onChange={(e) => { setLat(e.target.value); setCoordsError(null); }}
+                className="form-input"
+                placeholder="緯度 (例: 16.0034)"
+                inputMode="decimal"
+              />
+              <input
+                type="text"
+                value={lng}
+                onChange={(e) => { setLng(e.target.value); setCoordsError(null); }}
+                className="form-input"
+                placeholder="経度 (例: 108.2622)"
+                inputMode="decimal"
+              />
+            </div>
+            {(lat || lng) && (
+              <p className="font-serif italic text-[10px] tracking-[0.05em] text-olive mt-2">
+                ✓ 座標が設定されています
+              </p>
+            )}
           </Field>
 
           <Field label="LINKS" labelJa="関連URL" optional>

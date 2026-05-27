@@ -63,6 +63,7 @@ interface Props {
 
 // ホテルの mapUrl から座標を抽出するヘルパー
 function extractHotelCoords(h: Hotel): { lat: number; lng: number } | null {
+  if (h.lat != null && h.lng != null) return { lat: h.lat, lng: h.lng };
   if (!h.mapUrl) return null;
   const m = h.mapUrl.match(/@(-?\d+\.\d+),(-?\d+\.\d+)/);
   if (m) return { lat: parseFloat(m[1]), lng: parseFloat(m[2]) };

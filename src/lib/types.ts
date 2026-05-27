@@ -46,6 +46,8 @@ export interface Hotel {
   checkIn: string;
   checkOut: string;
   mapUrl?: string;
+  lat?: number;
+  lng?: number;
   urls?: string[];
   phone?: string;
   createdAt: string;
