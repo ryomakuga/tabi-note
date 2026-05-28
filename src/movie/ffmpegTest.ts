@@ -1,7 +1,5 @@
 import { FFmpeg } from "@ffmpeg/ffmpeg";
-import { toBlobURL, fetchFile } from "@ffmpeg/util";
-
-const baseURL = "/ffmpeg";
+import { fetchFile } from "@ffmpeg/util";
 
 async function loadFFmpeg(): Promise<FFmpeg> {
   const ffmpeg = new FFmpeg();
@@ -9,10 +7,12 @@ async function loadFFmpeg(): Promise<FFmpeg> {
   ffmpeg.on("progress", ({ progress }) =>
     console.log("[progress]", Math.round(progress * 100) + "%")
   );
+  const origin = window.location.origin;
   console.log("LOAD: load()呼び出し直前");
   await ffmpeg.load({
-    coreURL: await toBlobURL(`${baseURL}/ffmpeg-core.js`, "text/javascript"),
-    wasmURL: await toBlobURL(`${baseURL}/ffmpeg-core.wasm`, "application/wasm"),
+    coreURL: new URL("/ffmpeg/ffmpeg-core.js", origin).href,
+    wasmURL: new URL("/ffmpeg/ffmpeg-core.wasm", origin).href,
+    classWorkerURL: new URL("/ffmpeg/esm/worker.js", origin).href,
   });
   console.log("LOAD: load()完了");
   return ffmpeg;
