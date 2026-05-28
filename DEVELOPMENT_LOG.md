@@ -818,3 +818,50 @@ Safari は LAN IP の http:// を Insecure Context と判定し、Web Crypto API
 - LockScreen の try-catch エラー表示は debugging 用なのでいずれクリーンアップ
 
 出発まで:あと 40 日
+
+---
+
+## Step 24:ホテルの地図ピン表示対応(2026/05/27)
+
+### 概要
+ホテルを地図(Places の MAP ビュー)にピン表示できるようにした。
+従来スポット・食事には位置情報(lat/lng)があったが、ホテルには無く地図に出せなかった。スポット・食事の実装をお手本に、ホテルにも座標機能を追加。
+
+### 変更ファイル(3つ)
+- **src/lib/types.ts** — Hotel 型に `lat?: number` `lng?: number` を追加
+- **src/components/HotelFormModal.tsx** — COORDINATES 入力 UI を追加
+  - Google マップ URL から座標を抽出する `extractCoordsFromMapsUrl` 関数
+  - 「Google マップで開く」ボタン + 「クリップボードから座標を取得」ボタン + 手動入力欄
+  - 保存データに lat/lng を含める
+- **src/components/SpotMapView.tsx** — `extractHotelCoords` を lat/lng 優先に変更
+  - 従来は mapUrl からのみ座標抽出 → まず h.lat/h.lng を見るように修正
+  - (ホテルピンの描画・hotelIcon・ポップアップは既に実装済みだった)
+
+### 動作確認
+- ホテル編集フォームに COORDINATES 欄が表示されることを確認
+- シェラトン グランド ダナンに座標(15.9810392, 108.2779915)を入力 → 保存
+- 地図にダークゴールドのひし形ピンが立つことを確認
+- ポップアップ(— stay / ホテル名 / Google マップで開く)も表示 OK
+- `npx tsc --noEmit` で型エラー 0 を確認
+
+### トラブルと対処
+- ファイル全置換時、`<a` タグの1行がターミナル貼り付けで欠落 → PARSE_ERROR
+- 該当箇所に `<a` を1行挿入して解決(動作・型チェックともに OK)
+
+### コミット
+- 9b1e407 feat: ホテルに位置情報(lat/lng)を追加、地図にホテルピン表示
+- GitHub へ push 済み(Mac + GitHub の2か所保存)
+
+### データ復旧の記録(5/25〜5/27)
+- 5/25:アプリの IndexedDB が空になり「データ消失」と誤認 → 実際はコード・バックアップとも無事
+- 原因:ポート違い(5175 ↔ 5173)で IndexedDB が別物になっていた / DB クリア済みだった
+- 5/17 バックアップから復元 → その後アプリ最新状態を 5/27・5/28 バックアップとして保存
+- 教訓:アプリURLは https://localhost:5173、作業後は必ず commit + push、バックアップは旅行アプリフォルダに集約
+
+### 未完了タスク(次回候補)
+- iPhone PWA インストール + 実機での触り心地レビュー(Step 23 から継続)
+- 他データの地図確認(スポット2・食事1・ホテル1、計4ピンが揃った)
+- LockScreen の try-catch エラー表示のクリーンアップ
+- カバー画像対応(F-01 拡張)
+
+出発まで:あと 32 日
