@@ -62,3 +62,66 @@ export async function testMakeVideo(): Promise<string> {
   const blob = new Blob([data], { type: "video/mp4" });
   return URL.createObjectURL(blob);
 }
+
+
+
+// HEICをJPEGに変換するヘルパー(heic2anyを動的import)
+async function convertIfHeic(blob: Blob): Promise<Blob> {
+  const isHeic =
+    blob.type === "image/heic" ||
+    blob.type === "image/heif" ||
+    /\.heic$|\.heif$/i.test((blob as File).name || "");
+  if (!isHeic) return blob;
+  console.log("[heic2any] HEIC検出 → JPEG変換");
+  const heic2any = (await import("heic2any")).default;
+  const converted = await heic2any({ blob, toType: "image/jpeg", quality: 0.9 });
+  return Array.isArray(converted) ? converted[0] : converted;
+}
+
+// 本番用: 画像Blobの配列から無音MP4を作る(HEIC/JPEG/PNG対応)
+export async function makeSlideshowFromBlobs(
+  images: Blob[],
+  secondsPerImage = 2
+): Promise<string> {
+  if (images.length === 0) throw new Error("画像が0枚です");
+
+  // 1. HEIC変換(必要なものだけ)
+  const prepared: Blob[] = [];
+  for (let i = 0; i < images.length; i++) {
+    prepared.push(await convertIfHeic(images[i]));
+  }
+  console.log("画像準備完了:", prepared.length, "枚");
+
+  // 2. FFmpeg起動
+  const ffmpeg = await loadFFmpeg();
+
+  // 3. 仮想ファイルシステムに書き込み、concatリスト作成
+  const listLines: string[] = [];
+  for (let i = 0; i < prepared.length; i++) {
+    const ext = prepared[i].type.includes("png") ? "png" : "jpg";
+    const filename = `img${i}.${ext}`;
+    await ffmpeg.writeFile(filename, await fetchFile(prepared[i]));
+    listLines.push(`file '${filename}'`);
+    listLines.push(`duration ${secondsPerImage}`);
+  }
+  // concatデマクサ仕様: 最後の画像をもう一度
+  const lastFile = listLines[listLines.length - 2];
+  listLines.push(lastFile);
+
+  await ffmpeg.writeFile("list.txt", new TextEncoder().encode(listLines.join("\n")));
+
+  // 4. エンコード
+  await ffmpeg.exec([
+    "-f", "concat", "-safe", "0",
+    "-i", "list.txt",
+    "-vsync", "vfr",
+    "-c:v", "libx264",
+    "-pix_fmt", "yuv420p",
+    "-vf", "fps=30,scale=1280:720:force_original_aspect_ratio=decrease,pad=1280:720:(ow-iw)/2:(oh-ih)/2:color=black",
+    "out.mp4",
+  ]);
+
+  const data = await ffmpeg.readFile("out.mp4");
+  const blob = new Blob([data], { type: "video/mp4" });
+  return URL.createObjectURL(blob);
+}
