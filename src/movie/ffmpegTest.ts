@@ -10,8 +10,8 @@ async function loadFFmpeg(): Promise<FFmpeg> {
   const origin = window.location.origin;
   console.log("LOAD: load()呼び出し直前");
   await ffmpeg.load({
-    coreURL: new URL("/ffmpeg/ffmpeg-core.js", origin).href,
-    wasmURL: new URL("/ffmpeg/ffmpeg-core.wasm", origin).href,
+    coreURL: new URL("/ffmpeg/esm-core/ffmpeg-core.js", origin).href,
+    wasmURL: new URL("/ffmpeg/esm-core/ffmpeg-core.wasm", origin).href,
     classWorkerURL: new URL("/ffmpeg/esm/worker.js", origin).href,
   });
   console.log("LOAD: load()完了");
@@ -39,18 +39,14 @@ export async function testMakeVideo(): Promise<string> {
   console.log("STEP 1: load開始");
   const ffmpeg = await loadFFmpeg();
   console.log("STEP 2: load完了");
-
   const png0 = await makeColorPng("#8B7355");
   const png1 = await makeColorPng("#5C7548");
   console.log("STEP 3: PNG生成完了", png0.size, png1.size);
-
   await ffmpeg.writeFile("img0.png", await fetchFile(png0));
   await ffmpeg.writeFile("img1.png", await fetchFile(png1));
   console.log("STEP 5: 書き込み完了");
-
   const files = await ffmpeg.listDir("/");
   console.log("STEP 6: ファイル一覧", files);
-
   console.log("STEP 7: exec開始");
   const ret = await ffmpeg.exec([
     "-framerate", "0.5",
@@ -61,10 +57,8 @@ export async function testMakeVideo(): Promise<string> {
     "out.mp4",
   ]);
   console.log("STEP 8: exec完了 ret=", ret);
-
   const data = await ffmpeg.readFile("out.mp4");
   console.log("STEP 9: readFile完了", (data as Uint8Array).length, "bytes");
-
   const blob = new Blob([data], { type: "video/mp4" });
   return URL.createObjectURL(blob);
 }

@@ -11,8 +11,8 @@
   },
   "dependencies": {
     "@ffmpeg/core": "^0.12.6",
-    "@ffmpeg/ffmpeg": "^0.12.15",
-    "@ffmpeg/util": "^0.12.2",
+    "@ffmpeg/ffmpeg": "^0.12.10",
+    "@ffmpeg/util": "^0.12.1",
     "dexie": "^4.4.2",
     "leaflet": "^1.9.4",
     "react": "^19.2.6",
