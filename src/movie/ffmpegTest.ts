@@ -135,3 +135,66 @@ export function downloadVideo(url: string, filename = "tabi-note-movie.mp4"): vo
   a.click();
   document.body.removeChild(a);
 }
+
+// 写真スライドショーに音楽を載せたMP4を作る(HEIC/JPEG/PNG画像 + mp3/m4a/wav音楽)
+export async function makeSlideshowWithMusic(
+  images: Blob[],
+  musicFile: Blob,
+  secondsPerImage = 2
+): Promise<string> {
+  if (images.length === 0) throw new Error("画像が0枚です");
+  if (!musicFile) throw new Error("音楽ファイルがありません");
+
+  // 1. HEIC変換(必要なものだけ)
+  const prepared: Blob[] = [];
+  for (let i = 0; i < images.length; i++) {
+    prepared.push(await convertIfHeic(images[i]));
+  }
+  console.log("画像準備完了:", prepared.length, "枚");
+
+  // 2. FFmpeg起動
+  const ffmpeg = await loadFFmpeg();
+
+  // 3. 画像書き込み + concatリスト作成
+  const listLines: string[] = [];
+  for (let i = 0; i < prepared.length; i++) {
+    const ext = prepared[i].type.includes("png") ? "png" : "jpg";
+    const filename = `img${i}.${ext}`;
+    await ffmpeg.writeFile(filename, await fetchFile(prepared[i]));
+    listLines.push(`file '${filename}'`);
+    listLines.push(`duration ${secondsPerImage}`);
+  }
+  listLines.push(listLines[listLines.length - 2]);
+  await ffmpeg.writeFile("list.txt", new TextEncoder().encode(listLines.join("\n")));
+
+  // 4. 音楽ファイル書き込み(拡張子で形式判定)
+  const t = musicFile.type;
+  const name = (musicFile as File).name || "";
+  const audioExt =
+    t.includes("mp4") || t.includes("m4a") || /\.m4a$/i.test(name) ? "m4a"
+    : t.includes("wav") || /\.wav$/i.test(name) ? "wav"
+    : "mp3";
+  await ffmpeg.writeFile(`bgm.${audioExt}`, await fetchFile(musicFile));
+  console.log("音楽準備完了:", musicFile.type, musicFile.size, "bytes (.", audioExt, ")");
+
+  // 5. エンコード(動画+音楽合成、動画の長さに合わせる)
+  await ffmpeg.exec([
+    "-f", "concat", "-safe", "0",
+    "-i", "list.txt",
+    "-i", `bgm.${audioExt}`,
+    "-map", "0:v",
+    "-map", "1:a",
+    "-vsync", "vfr",
+    "-c:v", "libx264",
+    "-pix_fmt", "yuv420p",
+    "-c:a", "aac",
+    "-b:a", "192k",
+    "-vf", "fps=30,scale=1280:720:force_original_aspect_ratio=decrease,pad=1280:720:(ow-iw)/2:(oh-ih)/2:color=black",
+    "-shortest",
+    "out.mp4",
+  ]);
+
+  const data = await ffmpeg.readFile("out.mp4");
+  const blob = new Blob([data], { type: "video/mp4" });
+  return URL.createObjectURL(blob);
+}
