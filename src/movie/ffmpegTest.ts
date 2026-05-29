@@ -125,3 +125,13 @@ export async function makeSlideshowFromBlobs(
   const blob = new Blob([data], { type: "video/mp4" });
   return URL.createObjectURL(blob);
 }
+
+// Blob URLをmp4ファイルとしてダウンロードする
+export function downloadVideo(url: string, filename = "tabi-note-movie.mp4"): void {
+  const a = document.createElement("a");
+  a.href = url;
+  a.download = filename;
+  document.body.appendChild(a);
+  a.click();
+  document.body.removeChild(a);
+}
