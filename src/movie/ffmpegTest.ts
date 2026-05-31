@@ -198,3 +198,72 @@ export async function makeSlideshowWithMusic(
   const blob = new Blob([data], { type: "video/mp4" });
   return URL.createObjectURL(blob);
 }
+
+// ───────── 実験:写真+動画クリップを音声なしで連結できるか検証(段階6-1) ─────────
+// 各クリップを 1280x720 / 30fps / libx264 に正規化してから concat する。
+// images: 写真Blob[]、videos: 動画Blob[] を、写真→動画 の順に1本へ繋ぐ最小テスト。
+export async function testConcatPhotosAndVideos(
+  images: Blob[],
+  videos: Blob[],
+  secondsPerImage = 2
+): Promise<string> {
+  const ffmpeg = await loadFFmpeg();
+  const parts: string[] = [];
+  let idx = 0;
+
+  // 1. 写真 → 無音の正規化mp4 に変換
+  for (const img of images) {
+    const prepared = await convertIfHeic(img);
+    const inName = `pin${idx}.jpg`;
+    const outName = `seg${idx}.mp4`;
+    await ffmpeg.writeFile(inName, await fetchFile(prepared));
+    await ffmpeg.exec([
+      "-loop", "1",
+      "-i", inName,
+      "-t", String(secondsPerImage),
+      "-r", "30",
+      "-vf", "scale=1280:720:force_original_aspect_ratio=decrease,pad=1280:720:(ow-iw)/2:(oh-ih)/2:color=black,format=yuv420p",
+      "-c:v", "libx264",
+      "-an",
+      outName,
+    ]);
+    parts.push(outName);
+    idx++;
+    console.log("写真セグメント完了:", outName);
+  }
+
+  // 2. 動画 → 同じ規格に正規化(音声は一旦なし)
+  for (const vid of videos) {
+    const inName = `vin${idx}.mp4`;
+    const outName = `seg${idx}.mp4`;
+    await ffmpeg.writeFile(inName, await fetchFile(vid));
+    await ffmpeg.exec([
+      "-i", inName,
+      "-r", "30",
+      "-vf", "scale=1280:720:force_original_aspect_ratio=decrease,pad=1280:720:(ow-iw)/2:(oh-ih)/2:color=black,format=yuv420p",
+      "-c:v", "libx264",
+      "-an",
+      outName,
+    ]);
+    parts.push(outName);
+    idx++;
+    console.log("動画セグメント完了:", outName);
+  }
+
+  // 3. concat リスト作成
+  const listLines = parts.map((p) => `file '${p}'`);
+  await ffmpeg.writeFile("concatlist.txt", new TextEncoder().encode(listLines.join("\n")));
+
+  // 4. 連結(再エンコードなしでコピー連結)
+  await ffmpeg.exec([
+    "-f", "concat", "-safe", "0",
+    "-i", "concatlist.txt",
+    "-c", "copy",
+    "concat_out.mp4",
+  ]);
+
+  const data = await ffmpeg.readFile("concat_out.mp4");
+  const blob = new Blob([data], { type: "video/mp4" });
+  console.log("連結完了:", blob.size, "bytes");
+  return URL.createObjectURL(blob);
+}
