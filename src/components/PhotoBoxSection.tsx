@@ -2,6 +2,8 @@ import { useEffect, useRef, useState } from 'react';
 import { usePhotosStore } from '../lib/photos-store';
 import { PhotoGalleryModal } from './PhotoGalleryModal';
 import MovieMaker from '../movie/MovieMaker';
+import { useMoviesStore } from '../lib/movies-store';
+import type { Movie } from '../lib/types';
 import type { Photo } from '../lib/types';
 
 interface Props {
@@ -129,6 +131,9 @@ export function PhotoBoxSection({ tripId }: Props) {
       )}
 
       {/* ムービー生成オーバーレイ */}
+      {/* 保存したムービー一覧 */}
+      <SavedMovies tripId={tripId} />
+
       {isMovieOpen && (
         <MovieMaker open={isMovieOpen} onClose={() => setIsMovieOpen(false)} tripId={tripId} />
       )}
@@ -307,4 +312,94 @@ function countUniqueDays(photos: Photo[]): number {
     set.add(`${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`);
   }
   return set.size;
+}
+
+/* ───────── 保存したムービー一覧 ───────── */
+function SavedMovies({ tripId }: { tripId: string }) {
+  const loadMovies = useMoviesStore((s) => s.loadMovies);
+  const removeMovie = useMoviesStore((s) => s.removeMovie);
+  const allMovies = useMoviesStore((s) => s.movies);
+  const movies = allMovies.filter((m) => m.tripId === tripId);
+
+  useEffect(() => {
+    if (tripId) loadMovies(tripId);
+  }, [tripId, loadMovies]);
+
+  if (movies.length === 0) return null;
+
+  return (
+    <div className="mt-10">
+      <div className="flex items-center gap-4 mb-5">
+        <span className="font-serif text-[11px] tracking-[0.4em] uppercase text-accent whitespace-nowrap">
+          — Movies
+        </span>
+        <span className="flex-1 h-px bg-line" />
+      </div>
+      <div className="space-y-5">
+        {movies.map((m) => (
+          <SavedMovieCard key={m.id} movie={m} onDelete={() => removeMovie(m.id)} />
+        ))}
+      </div>
+    </div>
+  );
+}
+
+function SavedMovieCard({ movie, onDelete }: { movie: Movie; onDelete: () => void }) {
+  const [url, setUrl] = useState<string | null>(null);
+
+  useEffect(() => {
+    const u = URL.createObjectURL(movie.blob);
+    setUrl(u);
+    return () => URL.revokeObjectURL(u);
+  }, [movie.blob]);
+
+  const handleDelete = () => {
+    if (!confirm('このムービーを削除しますか?')) return;
+    onDelete();
+  };
+
+  const download = () => {
+    if (!url) return;
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = movie.name || 'tabi-note-movie.mp4';
+    a.click();
+  };
+
+  return (
+    <div className="border border-line p-3">
+      {url && (
+        <video src={url} controls playsInline className="w-full bg-black mb-3" />
+      )}
+      <div className="flex items-center justify-between">
+        <span className="font-serif italic text-[11px] text-text-sub tracking-[0.1em]">
+          {formatMovieDate(movie.createdAt)}
+        </span>
+        <div className="flex gap-4">
+          <button
+            onClick={download}
+            className="font-serif text-[9px] tracking-[0.3em] uppercase text-text hover:text-accent"
+          >
+            Download
+          </button>
+          <button
+            onClick={handleDelete}
+            className="font-serif text-[9px] tracking-[0.3em] uppercase text-text-sub hover:text-text"
+          >
+            Delete
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function formatMovieDate(iso: string): string {
+  try {
+    const d = new Date(iso);
+    const pad = (n: number) => String(n).padStart(2, '0');
+    return `${d.getFullYear()}.${pad(d.getMonth() + 1)}.${pad(d.getDate())} · ${pad(d.getHours())}:${pad(d.getMinutes())}`;
+  } catch {
+    return iso;
+  }
 }

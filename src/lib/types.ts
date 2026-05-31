@@ -104,6 +104,14 @@ export interface MusicTrack {
   createdAt: string;
 }
 
+export interface Movie {
+  id: string;
+  tripId: string;
+  name: string;
+  blob: Blob;
+  createdAt: string;
+}
+
 export interface Session {
   deviceId: string;
   unlockedAt: string;

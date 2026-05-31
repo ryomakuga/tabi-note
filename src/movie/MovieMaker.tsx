@@ -7,6 +7,7 @@ import {
 } from "./ffmpegTest";
 import { usePhotosStore } from "../lib/photos-store";
 import { useMusicStore } from "../lib/music-store";
+import { useMoviesStore } from "../lib/movies-store";
 import type { Photo, MusicTrack } from "../lib/types";
 
 type Step = "source" | "appPhotos" | "music" | "generating" | "done" | "error";
@@ -41,6 +42,7 @@ export default function MovieMaker({
   const [videoUrl, setVideoUrl] = useState("");
   const [errorMsg, setErrorMsg] = useState("");
   const [selectedIds, setSelectedIds] = useState<string[]>([]);
+  const [saveState, setSaveState] = useState<"idle" | "saving" | "saved">("idle");
 
   const photoInput = useRef<HTMLInputElement>(null);
   const musicInput = useRef<HTMLInputElement>(null);
@@ -56,6 +58,9 @@ export default function MovieMaker({
   const removeTrack = useMusicStore((s) => s.removeTrack);
   const tracks = useMusicStore((s) => s.tracks);
 
+  // アプリ内ムービー保存
+  const addMovie = useMoviesStore((s) => s.addMovie);
+
   useEffect(() => {
     if (open && tripId) loadPhotos(tripId);
     if (open) loadTracks();
@@ -65,9 +70,23 @@ export default function MovieMaker({
 
   const reset = () => {
     setStep("source"); setPhotos([]); setMusic(null);
-    setVideoUrl(""); setErrorMsg(""); setSelectedIds([]);
+    setVideoUrl(""); setErrorMsg(""); setSelectedIds([]); setSaveState("idle");
   };
   const close = () => { reset(); onClose(); };
+
+  // 生成したムービーをアプリに保存
+  const saveToApp = async () => {
+    if (!videoUrl) return;
+    setSaveState("saving");
+    try {
+      const blob = await fetch(videoUrl).then((r) => r.blob());
+      await addMovie(tripId, blob);
+      setSaveState("saved");
+    } catch (err) {
+      console.error("ムービーの保存に失敗:", err);
+      setSaveState("idle");
+    }
+  };
 
   // ファイルから写真を選ぶ
   const pickPhotos = (e: ChangeEvent<HTMLInputElement>) => {
@@ -291,6 +310,13 @@ export default function MovieMaker({
             <video src={videoUrl} controls playsInline style={S.video} />
             <button style={S.solidBtn} onClick={() => downloadVideo(videoUrl, "tabi-note-movie.mp4")}>
               ダウンロード —
+            </button>
+            <button
+              style={{ ...S.outlineBtn, marginTop: 14, opacity: saveState === "saved" ? 0.5 : 1 }}
+              disabled={saveState !== "idle"}
+              onClick={saveToApp}
+            >
+              {saveState === "saving" ? "保存中…" : saveState === "saved" ? "✓ アプリに保存しました" : "＋ アプリに保存する"}
             </button>
             <button style={S.textBtn} onClick={reset}>もう一度作る</button>
             <button style={S.textBtn} onClick={close}>閉じる</button>
