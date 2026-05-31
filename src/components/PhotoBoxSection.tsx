@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { usePhotosStore } from '../lib/photos-store';
 import { PhotoGalleryModal } from './PhotoGalleryModal';
+import MovieMaker from '../movie/MovieMaker';
 import type { Photo } from '../lib/types';
 
 interface Props {
@@ -17,6 +18,7 @@ export function PhotoBoxSection({ tripId }: Props) {
   const [isAdding, setIsAdding] = useState(false);
   const [selectedPhoto, setSelectedPhoto] = useState<Photo | null>(null);
   const [isGalleryOpen, setIsGalleryOpen] = useState(false);
+  const [isMovieOpen, setIsMovieOpen] = useState(false);
 
   useEffect(() => {
     if (tripId) loadPhotos(tripId);
@@ -98,6 +100,14 @@ export function PhotoBoxSection({ tripId }: Props) {
                 {photos.length - 10} more photos in the gallery
               </p>
             )}
+
+            {/* ムービー生成への動線 */}
+            <button
+              onClick={() => setIsMovieOpen(true)}
+              className="block w-full mt-4 border border-text px-7 py-3.5 font-serif text-[10.5px] tracking-[0.4em] uppercase text-bg bg-text hover:bg-transparent hover:text-text transition-colors"
+            >
+              — Make a Movie —
+            </button>
           </div>
         </>
       )}
@@ -116,6 +126,11 @@ export function PhotoBoxSection({ tripId }: Props) {
           tripId={tripId}
           onClose={() => setIsGalleryOpen(false)}
         />
+      )}
+
+      {/* ムービー生成オーバーレイ */}
+      {isMovieOpen && (
+        <MovieMaker open={isMovieOpen} onClose={() => setIsMovieOpen(false)} />
       )}
     </>
   );
