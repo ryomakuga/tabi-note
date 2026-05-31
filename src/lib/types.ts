@@ -97,6 +97,13 @@ export interface Photo {
   createdAt: string;
 }
 
+export interface MusicTrack {
+  id: string;
+  name: string;
+  blob: Blob;
+  createdAt: string;
+}
+
 export interface Session {
   deviceId: string;
   unlockedAt: string;

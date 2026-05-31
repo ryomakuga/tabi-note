@@ -6,7 +6,8 @@ import {
   downloadVideo,
 } from "./ffmpegTest";
 import { usePhotosStore } from "../lib/photos-store";
-import type { Photo } from "../lib/types";
+import { useMusicStore } from "../lib/music-store";
+import type { Photo, MusicTrack } from "../lib/types";
 
 type Step = "source" | "appPhotos" | "music" | "generating" | "done" | "error";
 
@@ -49,9 +50,16 @@ export default function MovieMaker({
   const allPhotos = usePhotosStore((s) => s.photos);
   const boxPhotos = allPhotos.filter((p) => p.tripId === tripId);
 
+  // 保存済みの音楽
+  const loadTracks = useMusicStore((s) => s.loadTracks);
+  const addTrack = useMusicStore((s) => s.addTrack);
+  const removeTrack = useMusicStore((s) => s.removeTrack);
+  const tracks = useMusicStore((s) => s.tracks);
+
   useEffect(() => {
     if (open && tripId) loadPhotos(tripId);
-  }, [open, tripId, loadPhotos]);
+    if (open) loadTracks();
+  }, [open, tripId, loadPhotos, loadTracks]);
 
   if (!open) return null;
 
@@ -61,7 +69,7 @@ export default function MovieMaker({
   };
   const close = () => { reset(); onClose(); };
 
-  // ファイルから選ぶ
+  // ファイルから写真を選ぶ
   const pickPhotos = (e: ChangeEvent<HTMLInputElement>) => {
     const files = Array.from(e.target.files ?? []);
     if (files.length) {
@@ -69,8 +77,24 @@ export default function MovieMaker({
       setStep("music");
     }
   };
-  const pickMusic = (e: ChangeEvent<HTMLInputElement>) => {
-    setMusic(e.target.files?.[0] ?? null);
+
+  // 音楽ファイルを選ぶ → 自動で保存
+  const pickMusic = async (e: ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    setMusic(file);
+    try {
+      await addTrack(file); // IndexedDB に保存(次回から一覧に出る)
+    } catch (err) {
+      console.error("音楽の保存に失敗:", err);
+    }
+    if (musicInput.current) musicInput.current.value = "";
+  };
+
+  // 保存済みの曲を選ぶ
+  const chooseSavedTrack = (t: MusicTrack) => {
+    const file = new File([t.blob], t.name, { type: t.blob.type || "audio/mpeg" });
+    setMusic(file);
   };
 
   // アプリの写真:選択トグル
@@ -83,7 +107,6 @@ export default function MovieMaker({
   // アプリの写真:選択確定 → File[] に変換して music へ
   const confirmAppPhotos = () => {
     const chosen = boxPhotos.filter((p) => selectedIds.includes(p.id));
-    // 撮影日時順に並べる
     chosen.sort((a, b) => a.takenAt.localeCompare(b.takenAt));
     const files = chosen.map(
       (p) => new File([p.blob], p.filename || `${p.id}.jpg`, { type: p.blob.type || "image/jpeg" })
@@ -204,10 +227,30 @@ export default function MovieMaker({
             <div style={S.lead}>ステップ 2 — 音楽を選ぶ</div>
             <div style={S.note}>{photos.length} 枚の写真でムービーを作ります</div>
 
+            {/* 保存済みの曲 */}
+            {tracks.length > 0 && (
+              <div style={{ marginTop: 18, marginBottom: 8 }}>
+                <div style={S.sitesLabel}>— 保存した音楽から選ぶ</div>
+                <div style={S.trackList}>
+                  {tracks.map((t) => {
+                    const isSel = music?.name === t.name;
+                    return (
+                      <div key={t.id} style={{ ...S.trackRow, ...(isSel ? S.trackRowSel : {}) }}>
+                        <button style={S.trackName} onClick={() => chooseSavedTrack(t)}>
+                          {isSel ? "♪ " : ""}{t.name}
+                        </button>
+                        <button style={S.trackDel} onClick={() => removeTrack(t.id)} title="削除">×</button>
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
+            )}
+
             <input ref={musicInput} type="file" accept="audio/*"
               style={{ display: "none" }} onChange={pickMusic} />
             <button style={S.outlineBtn} onClick={() => musicInput.current?.click()}>
-              ＋ 音楽ファイルを選ぶ
+              ＋ 音楽ファイルを選ぶ（新しく読み込む）
             </button>
             {music && <div style={S.note}>♪ {music.name}</div>}
 
@@ -219,7 +262,7 @@ export default function MovieMaker({
               ))}
             </div>
             <div style={S.hint}>
-              気に入った曲をダウンロードして、上の「音楽ファイルを選ぶ」で読み込んでください。
+              一度読み込んだ曲は保存され、次回から上の一覧で選べます。
             </div>
 
             <button style={{ ...S.solidBtn, opacity: music ? 1 : 0.35 }}
@@ -327,4 +370,12 @@ const S: Record<string, CSSProperties> = {
   thumbBadge: { position: "absolute", top: 4, right: 4, minWidth: 18, height: 18,
     background: C.accent, color: C.bg, borderRadius: "50%", fontFamily: FE, fontSize: 11,
     display: "flex", alignItems: "center", justifyContent: "center", padding: "0 4px" },
+  trackList: { display: "flex", flexDirection: "column", gap: 8 },
+  trackRow: { display: "flex", alignItems: "center", justifyContent: "space-between",
+    border: `1px solid ${C.line}`, padding: "0 4px 0 12px" },
+  trackRowSel: { border: `1px solid ${C.accent}`, background: C.bgAlt },
+  trackName: { flex: 1, textAlign: "left", background: "transparent", border: "none",
+    fontFamily: FJ, fontSize: 12.5, color: C.text, padding: "12px 0", cursor: "pointer" },
+  trackDel: { background: "transparent", border: "none", color: C.sub, fontSize: 18,
+    cursor: "pointer", padding: "8px 10px", lineHeight: 1 },
 };
