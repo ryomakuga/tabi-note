@@ -267,3 +267,91 @@ export async function testConcatPhotosAndVideos(
   console.log("連結完了:", blob.size, "bytes");
   return URL.createObjectURL(blob);
 }
+
+// ───────── 実験:写真+動画を連結し、BGMを乗せる(段階6-2、動画の音はまだ無視) ─────────
+export async function testConcatWithMusic(
+  images: Blob[],
+  videos: Blob[],
+  musicFile: Blob,
+  secondsPerImage = 2
+): Promise<string> {
+  const ffmpeg = await loadFFmpeg();
+  const parts: string[] = [];
+  let idx = 0;
+
+  // 1. 写真 → 無音の正規化mp4
+  for (const img of images) {
+    const prepared = await convertIfHeic(img);
+    const inName = `pin${idx}.jpg`;
+    const outName = `seg${idx}.mp4`;
+    await ffmpeg.writeFile(inName, await fetchFile(prepared));
+    await ffmpeg.exec([
+      "-loop", "1",
+      "-i", inName,
+      "-t", String(secondsPerImage),
+      "-r", "30",
+      "-vf", "scale=1280:720:force_original_aspect_ratio=decrease,pad=1280:720:(ow-iw)/2:(oh-ih)/2:color=black,format=yuv420p",
+      "-c:v", "libx264",
+      "-an",
+      outName,
+    ]);
+    parts.push(outName);
+    idx++;
+  }
+
+  // 2. 動画 → 同じ規格に正規化(音声なし)
+  for (const vid of videos) {
+    const inName = `vin${idx}.mp4`;
+    const outName = `seg${idx}.mp4`;
+    await ffmpeg.writeFile(inName, await fetchFile(vid));
+    await ffmpeg.exec([
+      "-i", inName,
+      "-r", "30",
+      "-vf", "scale=1280:720:force_original_aspect_ratio=decrease,pad=1280:720:(ow-iw)/2:(oh-ih)/2:color=black,format=yuv420p",
+      "-c:v", "libx264",
+      "-an",
+      outName,
+    ]);
+    parts.push(outName);
+    idx++;
+  }
+
+  // 3. concat リスト
+  const listLines = parts.map((p) => `file '${p}'`);
+  await ffmpeg.writeFile("concatlist.txt", new TextEncoder().encode(listLines.join("\n")));
+
+  // 4. 映像だけ連結(無音)
+  await ffmpeg.exec([
+    "-f", "concat", "-safe", "0",
+    "-i", "concatlist.txt",
+    "-c", "copy",
+    "merged_video.mp4",
+  ]);
+
+  // 5. BGM を書き込み(拡張子判定)
+  const t = musicFile.type;
+  const name = (musicFile as File).name || "";
+  const audioExt =
+    t.includes("mp4") || t.includes("m4a") || /\.m4a$/i.test(name) ? "m4a"
+    : t.includes("wav") || /\.wav$/i.test(name) ? "wav"
+    : "mp3";
+  await ffmpeg.writeFile(`bgm.${audioExt}`, await fetchFile(musicFile));
+
+  // 6. 連結映像 + BGM を合成(映像の長さに合わせる)
+  await ffmpeg.exec([
+    "-i", "merged_video.mp4",
+    "-i", `bgm.${audioExt}`,
+    "-map", "0:v",
+    "-map", "1:a",
+    "-c:v", "copy",
+    "-c:a", "aac",
+    "-b:a", "192k",
+    "-shortest",
+    "final_out.mp4",
+  ]);
+
+  const data = await ffmpeg.readFile("final_out.mp4");
+  const blob = new Blob([data], { type: "video/mp4" });
+  console.log("BGM付き連結完了:", blob.size, "bytes");
+  return URL.createObjectURL(blob);
+}
