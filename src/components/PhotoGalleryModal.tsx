@@ -217,12 +217,23 @@ function GalleryCell({ photo, className, onClick }: { photo: Photo; className: s
 
 function PhotoImage({ photo }: { photo: Photo }) {
   const [url, setUrl] = useState<string | null>(null);
+  const isVideo = photo.blob.type.startsWith('video/');
   useEffect(() => {
     const u = URL.createObjectURL(photo.blob);
     setUrl(u);
     return () => URL.revokeObjectURL(u);
   }, [photo.blob]);
   if (!url) return null;
+  if (isVideo) {
+    return (
+      <div className="relative w-full h-full">
+        <video src={`${url}#t=0.1`} className="w-full h-full object-cover" muted playsInline preload="metadata" />
+        <span className="absolute inset-0 flex items-center justify-center pointer-events-none">
+          <span className="text-bg text-[20px]">▶</span>
+        </span>
+      </div>
+    );
+  }
   return <img src={url} alt={photo.filename} className="w-full h-full object-cover" loading="lazy" />;
 }
 

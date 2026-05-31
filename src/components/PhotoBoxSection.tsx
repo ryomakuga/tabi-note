@@ -31,7 +31,7 @@ export function PhotoBoxSection({ tripId }: Props) {
     if (!files || files.length === 0) return;
     setIsAdding(true);
     try {
-      const fileArray = Array.from(files).filter((f) => f.type.startsWith('image/'));
+      const fileArray = Array.from(files).filter((f) => f.type.startsWith('image/') || f.type.startsWith('video/'));
       if (fileArray.length > 0) {
         await addPhotos(tripId, fileArray);
       }
@@ -75,7 +75,7 @@ export function PhotoBoxSection({ tripId }: Props) {
         <input
           ref={fileInputRef}
           type="file"
-          accept="image/*"
+          accept="image/*,video/*"
           multiple
           onChange={handleFileSelect}
           className="hidden"
@@ -196,25 +196,26 @@ function PhotoCell({
   onClick: () => void;
 }) {
   const [url, setUrl] = useState<string | null>(null);
-
+  const isVideo = photo.blob.type.startsWith('video/');
   useEffect(() => {
     const u = URL.createObjectURL(photo.blob);
     setUrl(u);
     return () => URL.revokeObjectURL(u);
   }, [photo.blob]);
-
   return (
     <button
       onClick={onClick}
       className={`relative overflow-hidden bg-bg-alt ${className}`}
     >
-      {url && (
-        <img
-          src={url}
-          alt={photo.filename}
-          className="w-full h-full object-cover"
-          loading="lazy"
-        />
+      {url && (isVideo ? (
+        <video src={`${url}#t=0.1`} className="w-full h-full object-cover" muted playsInline preload="metadata" />
+      ) : (
+        <img src={url} alt={photo.filename} className="w-full h-full object-cover" loading="lazy" />
+      ))}
+      {isVideo && (
+        <span className="absolute inset-0 flex items-center justify-center pointer-events-none">
+          <span className="text-bg text-[20px]">▶</span>
+        </span>
       )}
       {photo.isFavorite && (
         <span className="absolute top-2 right-2 w-[6px] h-[6px] bg-gold rounded-full ring-1 ring-bg" />
