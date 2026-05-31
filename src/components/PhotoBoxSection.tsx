@@ -130,7 +130,7 @@ export function PhotoBoxSection({ tripId }: Props) {
 
       {/* ムービー生成オーバーレイ */}
       {isMovieOpen && (
-        <MovieMaker open={isMovieOpen} onClose={() => setIsMovieOpen(false)} />
+        <MovieMaker open={isMovieOpen} onClose={() => setIsMovieOpen(false)} tripId={tripId} />
       )}
     </>
   );

@@ -1,12 +1,14 @@
 // src/movie/MovieMaker.tsx
-import { useState, useRef, type ChangeEvent, type CSSProperties } from "react";
+import { useState, useRef, useEffect, type ChangeEvent, type CSSProperties } from "react";
 import {
   makeSlideshowWithMusic,
   makeSlideshowFromBlobs,
   downloadVideo,
 } from "./ffmpegTest";
+import { usePhotosStore } from "../lib/photos-store";
+import type { Photo } from "../lib/types";
 
-type Step = "photos" | "music" | "generating" | "done" | "error";
+type Step = "source" | "appPhotos" | "music" | "generating" | "done" | "error";
 
 const C = {
   bg: "#ECE5D8", bgAlt: "#F5EFE5", accent: "#8B7355",
@@ -26,46 +28,79 @@ const MUSIC_SITES = [
 export default function MovieMaker({
   open,
   onClose,
+  tripId,
 }: {
   open: boolean;
   onClose: () => void;
+  tripId: string;
 }) {
-  const [step, setStep] = useState<Step>("photos");
+  const [step, setStep] = useState<Step>("source");
   const [photos, setPhotos] = useState<File[]>([]);
   const [music, setMusic] = useState<File | null>(null);
   const [videoUrl, setVideoUrl] = useState("");
   const [errorMsg, setErrorMsg] = useState("");
+  const [selectedIds, setSelectedIds] = useState<string[]>([]);
 
   const photoInput = useRef<HTMLInputElement>(null);
   const musicInput = useRef<HTMLInputElement>(null);
 
+  // 写真ボックス(全写真のうち、この旅行ぶん)
+  const loadPhotos = usePhotosStore((s) => s.loadPhotos);
+  const allPhotos = usePhotosStore((s) => s.photos);
+  const boxPhotos = allPhotos.filter((p) => p.tripId === tripId);
+
+  useEffect(() => {
+    if (open && tripId) loadPhotos(tripId);
+  }, [open, tripId, loadPhotos]);
+
   if (!open) return null;
 
   const reset = () => {
-    setStep("photos"); setPhotos([]); setMusic(null);
-    setVideoUrl(""); setErrorMsg("");
+    setStep("source"); setPhotos([]); setMusic(null);
+    setVideoUrl(""); setErrorMsg(""); setSelectedIds([]);
   };
   const close = () => { reset(); onClose(); };
 
+  // ファイルから選ぶ
   const pickPhotos = (e: ChangeEvent<HTMLInputElement>) => {
     const files = Array.from(e.target.files ?? []);
-    if (files.length) setPhotos(files);
+    if (files.length) {
+      setPhotos(files);
+      setStep("music");
+    }
   };
   const pickMusic = (e: ChangeEvent<HTMLInputElement>) => {
     setMusic(e.target.files?.[0] ?? null);
+  };
+
+  // アプリの写真:選択トグル
+  const toggleSelect = (id: string) => {
+    setSelectedIds((prev) =>
+      prev.includes(id) ? prev.filter((x) => x !== id) : [...prev, id]
+    );
+  };
+
+  // アプリの写真:選択確定 → File[] に変換して music へ
+  const confirmAppPhotos = () => {
+    const chosen = boxPhotos.filter((p) => selectedIds.includes(p.id));
+    // 撮影日時順に並べる
+    chosen.sort((a, b) => a.takenAt.localeCompare(b.takenAt));
+    const files = chosen.map(
+      (p) => new File([p.blob], p.filename || `${p.id}.jpg`, { type: p.blob.type || "image/jpeg" })
+    );
+    setPhotos(files);
+    setStep("music");
   };
 
   const generate = async (withMusic: boolean) => {
     setStep("generating");
     setErrorMsg("");
     try {
-      // ※ HEIC変換は make 関数側で対応済みの想定。もし未対応なら後で convertIfHeic を挟みます。
       const result = (
         withMusic && music
           ? await makeSlideshowWithMusic(photos, music, 2)
           : await makeSlideshowFromBlobs(photos, 2)
       ) as unknown;
-      // 戻り値が URL 文字列でも Blob でも動くよう両対応
       const url =
         typeof result === "string" ? result : URL.createObjectURL(result as Blob);
       setVideoUrl(url);
@@ -88,10 +123,10 @@ export default function MovieMaker({
         <div style={S.titleEn}>Make a Movie</div>
         <div style={S.titleJa}>旅のムービーを作る</div>
 
-        {(step === "photos" || step === "music") && (
+        {(step === "source" || step === "appPhotos" || step === "music") && (
           <div style={S.dots}>
             {[0, 1, 2].map((i) => {
-              const cur = step === "photos" ? 0 : 1;
+              const cur = step === "music" ? 1 : 0;
               return (
                 <span key={i} style={{ ...S.dot, background: i <= cur ? C.accent : C.line }} />
               );
@@ -99,25 +134,76 @@ export default function MovieMaker({
           </div>
         )}
 
-        {step === "photos" && (
+        {/* ───── ステップ1:写真ソースの選択 ───── */}
+        {step === "source" && (
           <div>
             <div style={S.lead}>ステップ 1 — 写真を選ぶ</div>
+
+            <button
+              style={S.outlineBtn}
+              onClick={() => { setSelectedIds([]); setStep("appPhotos"); }}
+            >
+              ＋ アプリの写真から選ぶ（{boxPhotos.length}）
+            </button>
+
             <input ref={photoInput} type="file" accept="image/*,.heic,.heif"
               multiple style={{ display: "none" }} onChange={pickPhotos} />
             <button style={S.outlineBtn} onClick={() => photoInput.current?.click()}>
-              ＋ 写真を選ぶ(複数可)
+              ＋ ファイルから選ぶ
             </button>
-            {photos.length > 0 && <div style={S.note}>{photos.length} 枚を選択中</div>}
-            <button style={{ ...S.solidBtn, opacity: photos.length ? 1 : 0.35 }}
-              disabled={!photos.length} onClick={() => setStep("music")}>
-              次へ —
-            </button>
+
+            <div style={S.hint}>
+              「アプリの写真」は、写真ボックスに保存した写真から選べます。<br />
+              「ファイル」は、スマホやPC内の写真を直接選べます。
+            </div>
           </div>
         )}
 
+        {/* ───── ステップ1b:アプリの写真グリッド ───── */}
+        {step === "appPhotos" && (
+          <div>
+            <div style={S.lead}>写真を選ぶ（タップで選択）</div>
+
+            {boxPhotos.length === 0 ? (
+              <div style={S.hint}>
+                写真ボックスにまだ写真がありません。<br />
+                先に Memories で写真を追加するか、「ファイルから選ぶ」をお使いください。
+              </div>
+            ) : (
+              <div style={S.grid}>
+                {boxPhotos.map((p) => (
+                  <PhotoThumb
+                    key={p.id}
+                    photo={p}
+                    selected={selectedIds.includes(p.id)}
+                    order={selectedIds.indexOf(p.id)}
+                    onClick={() => toggleSelect(p.id)}
+                  />
+                ))}
+              </div>
+            )}
+
+            {selectedIds.length > 0 && (
+              <div style={S.note}>{selectedIds.length} 枚を選択中</div>
+            )}
+
+            <button
+              style={{ ...S.solidBtn, opacity: selectedIds.length ? 1 : 0.35 }}
+              disabled={!selectedIds.length}
+              onClick={confirmAppPhotos}
+            >
+              次へ —
+            </button>
+            <button style={S.textBtn} onClick={() => setStep("source")}>← 戻る</button>
+          </div>
+        )}
+
+        {/* ───── ステップ2:音楽 ───── */}
         {step === "music" && (
           <div>
             <div style={S.lead}>ステップ 2 — 音楽を選ぶ</div>
+            <div style={S.note}>{photos.length} 枚の写真でムービーを作ります</div>
+
             <input ref={musicInput} type="file" accept="audio/*"
               style={{ display: "none" }} onChange={pickMusic} />
             <button style={S.outlineBtn} onClick={() => musicInput.current?.click()}>
@@ -141,7 +227,7 @@ export default function MovieMaker({
               ムービーを作成 —
             </button>
             <button style={S.textBtn} onClick={() => generate(false)}>音楽なしで作る</button>
-            <button style={S.textBtn} onClick={() => setStep("photos")}>← 写真を選び直す</button>
+            <button style={S.textBtn} onClick={() => setStep("source")}>← 写真を選び直す</button>
           </div>
         )}
 
@@ -181,6 +267,27 @@ export default function MovieMaker({
   );
 }
 
+/* ───── サムネイル(アプリ写真選択用) ───── */
+function PhotoThumb({
+  photo, selected, order, onClick,
+}: {
+  photo: Photo; selected: boolean; order: number; onClick: () => void;
+}) {
+  const [url, setUrl] = useState<string | null>(null);
+  useEffect(() => {
+    const u = URL.createObjectURL(photo.blob);
+    setUrl(u);
+    return () => URL.revokeObjectURL(u);
+  }, [photo.blob]);
+
+  return (
+    <button onClick={onClick} style={{ ...S.thumb, ...(selected ? S.thumbSel : {}) }}>
+      {url && <img src={url} alt={photo.filename} style={S.thumbImg} />}
+      {selected && <span style={S.thumbBadge}>{order + 1}</span>}
+    </button>
+  );
+}
+
 const S: Record<string, CSSProperties> = {
   overlay: { position: "fixed", inset: 0, background: C.bg, zIndex: 1000,
     display: "flex", justifyContent: "center", overflowY: "auto" },
@@ -202,7 +309,7 @@ const S: Record<string, CSSProperties> = {
     textTransform: "uppercase", cursor: "pointer", marginTop: 20 },
   textBtn: { width: "100%", padding: "12px 0", background: "transparent", border: "none",
     color: C.sub, fontFamily: FJ, fontSize: 12, cursor: "pointer", marginTop: 8 },
-  note: { fontFamily: FE, fontStyle: "italic", fontSize: 13, color: C.accent, marginBottom: 4 },
+  note: { fontFamily: FE, fontStyle: "italic", fontSize: 13, color: C.accent, marginBottom: 4, marginTop: 4 },
   sitesLabel: { fontFamily: FS, fontSize: 9, letterSpacing: "0.3em", textTransform: "uppercase",
     color: C.sub, marginTop: 28, marginBottom: 12 },
   sites: { display: "flex", flexDirection: "column", gap: 10 },
@@ -212,4 +319,12 @@ const S: Record<string, CSSProperties> = {
   center: { textAlign: "center", padding: "30px 0" },
   ornament: { fontFamily: FE, fontSize: 20, letterSpacing: "0.5em", color: C.secondary, marginBottom: 14 },
   video: { width: "100%", borderRadius: 2, marginTop: 6, background: "#000" },
+  grid: { display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 6, marginTop: 4 },
+  thumb: { position: "relative", aspectRatio: "1 / 1", padding: 0, border: "1px solid transparent",
+    background: C.bgAlt, cursor: "pointer", overflow: "hidden" },
+  thumbSel: { border: `2px solid ${C.accent}` },
+  thumbImg: { width: "100%", height: "100%", objectFit: "cover", display: "block" },
+  thumbBadge: { position: "absolute", top: 4, right: 4, minWidth: 18, height: 18,
+    background: C.accent, color: C.bg, borderRadius: "50%", fontFamily: FE, fontSize: 11,
+    display: "flex", alignItems: "center", justifyContent: "center", padding: "0 4px" },
 };
