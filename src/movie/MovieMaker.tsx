@@ -3,6 +3,7 @@ import { useState, useRef, useEffect, type ChangeEvent, type CSSProperties } fro
 import {
   makeSlideshowWithMusic,
   makeSlideshowFromBlobs,
+  makeMixedMovie,
   downloadVideo,
 } from "./ffmpegTest";
 import { usePhotosStore } from "../lib/photos-store";
@@ -138,14 +139,12 @@ export default function MovieMaker({
     setStep("generating");
     setErrorMsg("");
     try {
-      const result = (
-        withMusic && music
-          ? await makeSlideshowWithMusic(photos, music, 2)
-          : await makeSlideshowFromBlobs(photos, 2)
-      ) as unknown;
-      const url =
-        typeof result === "string" ? result : URL.createObjectURL(result as Blob);
-      setVideoUrl(url);
+      const items = photos.map((f) => ({ blob: f as Blob, isVideo: f.type.startsWith("video/") }));
+      const result = await makeMixedMovie(items, withMusic && music ? music : null, 2);
+      setVideoUrl(result.url);
+      if (result.skipped > 0) {
+        console.warn(result.skipped + "件の動画は対応していない形式のためスキップしました");
+      }
       setStep("done");
     } catch (err) {
       console.error(err);
