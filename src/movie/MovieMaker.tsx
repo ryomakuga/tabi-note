@@ -4,6 +4,7 @@ import {
   makeSlideshowWithMusic,
   makeSlideshowFromBlobs,
   makeMixedMovie,
+  makeMixedMovieWithDucking,
   downloadVideo,
 } from "./ffmpegTest";
 import { usePhotosStore } from "../lib/photos-store";
@@ -140,7 +141,7 @@ export default function MovieMaker({
     setErrorMsg("");
     try {
       const items = photos.map((f) => ({ blob: f as Blob, isVideo: f.type.startsWith("video/") }));
-      const result = await makeMixedMovie(items, withMusic && music ? music : null, 2);
+      const result = await makeMixedMovieWithDucking(items, withMusic && music ? music : null, 2, 0.12);
       setVideoUrl(result.url);
       if (result.skipped > 0) {
         console.warn(result.skipped + "件の動画は対応していない形式のためスキップしました");

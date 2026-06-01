@@ -452,3 +452,250 @@ export async function makeMixedMovie(
   console.log("合成完了:", blob.size, "bytes / スキップ:", skipped);
   return { url: URL.createObjectURL(blob), skipped };
 }
+
+// ───────── 実験:動画の声を残しBGMをダッキングして混ぜる(段階6-3) ─────────
+// 各クリップを正規化(写真=無音, 動画=音声付き)→ 連結 → 連結音声(動画の声)とBGMをamixで合成。
+// bgmVolume: BGMの基準音量(0.0〜1.0)。動画区間では動画の声が乗るので相対的にBGMが小さく感じる。
+export async function testDuckingMix(
+  items: MixedItem[],
+  musicFile: Blob,
+  secondsPerImage = 2,
+  bgmVolume = 0.25
+): Promise<{ url: string; skipped: number }> {
+  if (items.length === 0) throw new Error("素材が0個です");
+  if (!musicFile) throw new Error("音楽がありません");
+  const ffmpeg = await loadFFmpeg();
+  const parts: string[] = [];
+  let idx = 0;
+  let skipped = 0;
+
+  for (const item of items) {
+    const outName = `dseg${idx}.mp4`;
+    try {
+      if (item.isVideo) {
+        const inName = `dvin${idx}.mp4`;
+        await ffmpeg.writeFile(inName, await fetchFile(item.blob));
+        // 動画:映像正規化 + 音声をAACで残す。音声が無い動画でも無音トラックを付ける
+        await ffmpeg.exec([
+          "-i", inName,
+          "-f", "lavfi", "-t", "0.1", "-i", "anullsrc=channel_layout=stereo:sample_rate=48000",
+          "-map", "0:v:0",
+          "-map", "0:a:0?",
+          "-r", "30",
+          "-vf", "scale=1280:720:force_original_aspect_ratio=decrease,pad=1280:720:(ow-iw)/2:(oh-ih)/2:color=black,format=yuv420p",
+          "-c:v", "libx264",
+          "-c:a", "aac", "-ar", "48000", "-ac", "2",
+          "-shortest",
+          outName,
+        ]);
+      } else {
+        const prepared = await convertIfHeic(item.blob);
+        const inName = `dpin${idx}.jpg`;
+        await ffmpeg.writeFile(inName, await fetchFile(prepared));
+        // 写真:無音トラックを付けて正規化(音声トラックを揃えるため)
+        await ffmpeg.exec([
+          "-loop", "1",
+          "-i", inName,
+          "-f", "lavfi", "-i", "anullsrc=channel_layout=stereo:sample_rate=48000",
+          "-t", String(secondsPerImage),
+          "-r", "30",
+          "-vf", "scale=1280:720:force_original_aspect_ratio=decrease,pad=1280:720:(ow-iw)/2:(oh-ih)/2:color=black,format=yuv420p",
+          "-c:v", "libx264",
+          "-c:a", "aac", "-ar", "48000", "-ac", "2",
+          "-shortest",
+          outName,
+        ]);
+      }
+      parts.push(outName);
+      idx++;
+    } catch (e) {
+      console.warn("素材スキップ:", e);
+      skipped++;
+      idx++;
+    }
+  }
+  if (parts.length === 0) throw new Error("使える素材がありませんでした");
+
+  // 連結(映像も音声も持つクリップを繋ぐので再エンコード連結)
+  const listLines = parts.map((p) => `file '${p}'`);
+  await ffmpeg.writeFile("dlist.txt", new TextEncoder().encode(listLines.join("\n")));
+  await ffmpeg.exec([
+    "-f", "concat", "-safe", "0",
+    "-i", "dlist.txt",
+    "-c:v", "copy",
+    "-c:a", "aac",
+    "dmerged.mp4",
+  ]);
+
+  // BGM 書き込み
+  const t = musicFile.type;
+  const name = (musicFile as File).name || "";
+  const audioExt =
+    t.includes("mp4") || t.includes("m4a") || /\.m4a$/i.test(name) ? "m4a"
+    : t.includes("wav") || /\.wav$/i.test(name) ? "wav"
+    : "mp3";
+  await ffmpeg.writeFile(`dbgm.${audioExt}`, await fetchFile(musicFile));
+
+  // 連結映像の音声(動画の声) と BGM を混ぜる。
+  // [0:a]=動画の声(そのまま) / [1:a]=BGM(volumeで下げる) を amix。動画の声が入る区間でBGMが相対的に小さくなる。
+  await ffmpeg.exec([
+    "-i", "dmerged.mp4",
+    "-i", `dbgm.${audioExt}`,
+    "-filter_complex",
+    `[1:a]volume=${bgmVolume}[bg];[0:a][bg]amix=inputs=2:duration=first:dropout_transition=0[aout]`,
+    "-map", "0:v",
+    "-map", "[aout]",
+    "-c:v", "copy",
+    "-c:a", "aac",
+    "-b:a", "192k",
+    "dducked.mp4",
+  ]);
+
+  const data = await ffmpeg.readFile("dducked.mp4");
+  const blob = new Blob([data], { type: "video/mp4" });
+  console.log("ダッキング合成完了:", blob.size, "bytes / スキップ:", skipped);
+  return { url: URL.createObjectURL(blob), skipped };
+}
+
+// ───────── 切り分け用:動画1本のみ、声+BGMミックス(連結なし) ─────────
+export async function testDuckSingle(
+  videoBlob: Blob,
+  musicFile: Blob,
+  bgmVolume = 0.12
+): Promise<string> {
+  const ffmpeg = await loadFFmpeg();
+  await ffmpeg.writeFile("sv.mp4", await fetchFile(videoBlob));
+  const t = musicFile.type;
+  const name = (musicFile as File).name || "";
+  const audioExt =
+    t.includes("mp4") || t.includes("m4a") || /\.m4a$/i.test(name) ? "m4a"
+    : t.includes("wav") || /\.wav$/i.test(name) ? "wav"
+    : "mp3";
+  await ffmpeg.writeFile(`sbgm.${audioExt}`, await fetchFile(musicFile));
+  // 動画の声(0:a)を1.5倍に持ち上げ、BGM(1:a)を大きく下げる。
+  // amix の normalize=0 で自動音量調整を切り、各音量をそのまま保つ。
+  await ffmpeg.exec([
+    "-i", "sv.mp4",
+    "-i", `sbgm.${audioExt}`,
+    "-filter_complex",
+    `[0:a]volume=1.5[voice];[1:a]volume=${bgmVolume}[bg];[voice][bg]amix=inputs=2:duration=first:dropout_transition=0:normalize=0[aout]`,
+    "-map", "0:v",
+    "-map", "[aout]",
+    "-c:v", "libx264",
+    "-vf", "scale=1280:720:force_original_aspect_ratio=decrease,pad=1280:720:(ow-iw)/2:(oh-ih)/2:color=black,format=yuv420p",
+    "-c:a", "aac", "-b:a", "192k",
+    "-shortest",
+    "ssingle.mp4",
+  ]);
+  const data = await ffmpeg.readFile("ssingle.mp4");
+  const blob = new Blob([data], { type: "video/mp4" });
+  console.log("単体ダッキング完了:", blob.size, "bytes");
+  return URL.createObjectURL(blob);
+}
+
+// ───────── 本番:写真+動画を連結し、動画の声を出しつつBGMをダッキング(段階6-3完成版) ─────────
+// 写真=無音, 動画=音声付き で正規化 → 連結 → 連結音声(動画の声)1.5倍 と BGM(bgmVolume倍)を normalize=0 で混ぜる。
+export async function makeMixedMovieWithDucking(
+  items: MixedItem[],
+  musicFile: Blob | null,
+  secondsPerImage = 2,
+  bgmVolume = 0.12
+): Promise<{ url: string; skipped: number }> {
+  if (items.length === 0) throw new Error("素材が0個です");
+  const ffmpeg = await loadFFmpeg();
+  const parts: string[] = [];
+  let idx = 0;
+  let skipped = 0;
+
+  for (const item of items) {
+    const outName = `mdseg${idx}.mp4`;
+    try {
+      if (item.isVideo) {
+        const inName = `mdvin${idx}.mp4`;
+        await ffmpeg.writeFile(inName, await fetchFile(item.blob));
+        // 動画:映像正規化 + 音声をAACで残す(音が無くても無音トラックを付ける)
+        await ffmpeg.exec([
+          "-i", inName,
+          "-f", "lavfi", "-t", "0.1", "-i", "anullsrc=channel_layout=stereo:sample_rate=48000",
+          "-map", "0:v:0",
+          "-map", "0:a:0?",
+          "-r", "30",
+          "-vf", "scale=1280:720:force_original_aspect_ratio=decrease,pad=1280:720:(ow-iw)/2:(oh-ih)/2:color=black,format=yuv420p",
+          "-c:v", "libx264",
+          "-c:a", "aac", "-ar", "48000", "-ac", "2",
+          "-shortest",
+          outName,
+        ]);
+      } else {
+        const prepared = await convertIfHeic(item.blob);
+        const inName = `mdpin${idx}.jpg`;
+        await ffmpeg.writeFile(inName, await fetchFile(prepared));
+        // 写真:無音トラックを付けて正規化(音声トラックを揃える)
+        await ffmpeg.exec([
+          "-loop", "1",
+          "-i", inName,
+          "-f", "lavfi", "-i", "anullsrc=channel_layout=stereo:sample_rate=48000",
+          "-t", String(secondsPerImage),
+          "-r", "30",
+          "-vf", "scale=1280:720:force_original_aspect_ratio=decrease,pad=1280:720:(ow-iw)/2:(oh-ih)/2:color=black,format=yuv420p",
+          "-c:v", "libx264",
+          "-c:a", "aac", "-ar", "48000", "-ac", "2",
+          "-shortest",
+          outName,
+        ]);
+      }
+      parts.push(outName);
+      idx++;
+    } catch (e) {
+      console.warn("素材スキップ:", e);
+      skipped++;
+      idx++;
+    }
+  }
+  if (parts.length === 0) throw new Error("使える素材がありませんでした");
+
+  // 連結(映像コピー、音声はAAC再エンコードで揃える)
+  const listLines = parts.map((p) => `file '${p}'`);
+  await ffmpeg.writeFile("mdlist.txt", new TextEncoder().encode(listLines.join("\n")));
+  await ffmpeg.exec([
+    "-f", "concat", "-safe", "0",
+    "-i", "mdlist.txt",
+    "-c:v", "copy",
+    "-c:a", "aac",
+    "mdmerged.mp4",
+  ]);
+
+  // BGMが無ければ、連結した(動画の声入り)動画をそのまま返す
+  if (!musicFile) {
+    const data = await ffmpeg.readFile("mdmerged.mp4");
+    const blob = new Blob([data], { type: "video/mp4" });
+    return { url: URL.createObjectURL(blob), skipped };
+  }
+
+  // BGM書き込み
+  const t = musicFile.type;
+  const name = (musicFile as File).name || "";
+  const audioExt =
+    t.includes("mp4") || t.includes("m4a") || /\.m4a$/i.test(name) ? "m4a"
+    : t.includes("wav") || /\.wav$/i.test(name) ? "wav"
+    : "mp3";
+  await ffmpeg.writeFile(`mdbgm.${audioExt}`, await fetchFile(musicFile));
+
+  // 連結音声(動画の声)を1.5倍、BGMをbgmVolume倍、normalize=0 で混ぜる
+  await ffmpeg.exec([
+    "-i", "mdmerged.mp4",
+    "-i", `mdbgm.${audioExt}`,
+    "-filter_complex",
+    `[0:a]volume=1.5[voice];[1:a]volume=${bgmVolume}[bg];[voice][bg]amix=inputs=2:duration=first:dropout_transition=0:normalize=0[aout]`,
+    "-map", "0:v",
+    "-map", "[aout]",
+    "-c:v", "copy",
+    "-c:a", "aac", "-b:a", "192k",
+    "mdfinal.mp4",
+  ]);
+
+  const data = await ffmpeg.readFile("mdfinal.mp4");
+  const blob = new Blob([data], { type: "video/mp4" });
+  console.log("ダッキング本番合成完了:", blob.size, "bytes / スキップ:", skipped);
+  return { url: URL.createObjectURL(blob), skipped };
+}
