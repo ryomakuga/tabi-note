@@ -917,3 +917,37 @@ Safari は LAN IP の http:// を Insecure Context と判定し、Web Crypto API
 - 動画の全画面詳細表示(PhotoDetailModal等がまだ img)
 
 出発まで:あと 27 日
+
+---
+
+## 2026-06-01(続き2)— 段階6-3 完成:動画の声+BGMダッキング
+
+### できたこと(あなたが最初に望んでいた機能が完成)
+- 動画が流れる間はBGMが小さくなり、動画の中の声・音が聞こえるようになった
+- Make a Movie の本番UIに反映済み(写真+動画を選んでムービー化 → 動画パートで声が出る)
+
+### 確定した音声設定(重要・今後の調整の基準)
+- 動画の声を volume=1.5 倍、BGMを volume=0.12 倍
+- amix を normalize=0(自動音量調整オフ)で混ぜる
+- これで「動画の声がはっきり、BGMは後ろで小さく」のバランスになった
+
+### 原因切り分けの記録(ハマったポイント)
+- 最初「動画の音が聞こえない」→ 元動画 IMG_3755.MOV には音があると確認 → ミックス側の問題と判明
+- amix のデフォルトは normalize=1 で両音を半減させるため、声もBGMも小さく潰れていた → normalize=0 で解決
+- tabi-note-movie.mp4 は無音動画。声の検証は IMG_3755.MOV(お祭り会場)で行った
+
+### 関数の構成(ffmpegTest.ts)
+- makeMixedMovieWithDucking = 本番(写真+動画連結 → 動画の声1.5倍 + BGM0.12 を normalize=0 でミックス)
+- makeMixedMovie(旧・ダッキングなし)は残置。MovieMakerのimportにも残るが未使用 → いずれ整理
+- 実験関数 testDuckingMix / testDuckSingle も残置
+
+### git
+- 65ad03b(段階6-3完成、本番UI接続)= push済み
+
+### 残り作業
+- 段階6-4:編集UIで動画パートのBGM音量を5段階で選べるように(bgmVolume を 0.05〜0.3 等で切替)
+- 未使用 import(makeMixedMovie)や実験関数の整理
+- HEVC動画のUI対応(選択時に警告 or 弾く)。今はスキップされるだけ
+- 動画の全画面詳細表示(まだ img)
+
+出発まで:あと 27 日
