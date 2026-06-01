@@ -343,15 +343,22 @@ function PhotoThumb({
   photo: Photo; selected: boolean; order: number; onClick: () => void;
 }) {
   const [url, setUrl] = useState<string | null>(null);
+  const isVideo = photo.blob.type.startsWith('video/');
   useEffect(() => {
     const u = URL.createObjectURL(photo.blob);
     setUrl(u);
     return () => URL.revokeObjectURL(u);
   }, [photo.blob]);
-
   return (
     <button onClick={onClick} style={{ ...S.thumb, ...(selected ? S.thumbSel : {}) }}>
-      {url && <img src={url} alt={photo.filename} style={S.thumbImg} />}
+      {url && (isVideo ? (
+        <video src={`${url}#t=0.1`} style={S.thumbImg} muted playsInline preload="metadata" />
+      ) : (
+        <img src={url} alt={photo.filename} style={S.thumbImg} />
+      ))}
+      {isVideo && (
+        <span style={{ position: "absolute", inset: 0, display: "flex", alignItems: "center", justifyContent: "center", pointerEvents: "none", color: "#fff", fontSize: 22, textShadow: "0 1px 4px rgba(0,0,0,0.6)" }}>▶</span>
+      )}
       {selected && <span style={S.thumbBadge}>{order + 1}</span>}
     </button>
   );
