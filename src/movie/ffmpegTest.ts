@@ -355,3 +355,100 @@ export async function testConcatWithMusic(
   console.log("BGM付き連結完了:", blob.size, "bytes");
   return URL.createObjectURL(blob);
 }
+
+// ───────── 本番用:写真+動画を撮影日時順に1本へ合成(BGM付き、動画の音は当面なし) ─────────
+// items: { blob, isVideo } の配列(呼び出し側で takenAt 順に並べて渡す)
+// HEVC等で変換に失敗した動画はスキップし、残りで続行する。
+export type MixedItem = { blob: Blob; isVideo: boolean };
+export async function makeMixedMovie(
+  items: MixedItem[],
+  musicFile: Blob | null,
+  secondsPerImage = 2
+): Promise<{ url: string; skipped: number }> {
+  if (items.length === 0) throw new Error("素材が0個です");
+  const ffmpeg = await loadFFmpeg();
+  const parts: string[] = [];
+  let idx = 0;
+  let skipped = 0;
+
+  for (const item of items) {
+    const outName = `seg${idx}.mp4`;
+    try {
+      if (item.isVideo) {
+        const inName = `vin${idx}.mp4`;
+        await ffmpeg.writeFile(inName, await fetchFile(item.blob));
+        await ffmpeg.exec([
+          "-i", inName,
+          "-r", "30",
+          "-vf", "scale=1280:720:force_original_aspect_ratio=decrease,pad=1280:720:(ow-iw)/2:(oh-ih)/2:color=black,format=yuv420p",
+          "-c:v", "libx264",
+          "-an",
+          outName,
+        ]);
+      } else {
+        const prepared = await convertIfHeic(item.blob);
+        const inName = `pin${idx}.jpg`;
+        await ffmpeg.writeFile(inName, await fetchFile(prepared));
+        await ffmpeg.exec([
+          "-loop", "1",
+          "-i", inName,
+          "-t", String(secondsPerImage),
+          "-r", "30",
+          "-vf", "scale=1280:720:force_original_aspect_ratio=decrease,pad=1280:720:(ow-iw)/2:(oh-ih)/2:color=black,format=yuv420p",
+          "-c:v", "libx264",
+          "-an",
+          outName,
+        ]);
+      }
+      parts.push(outName);
+      idx++;
+    } catch (e) {
+      console.warn("素材スキップ(変換失敗、HEVC等の可能性):", e);
+      skipped++;
+      idx++;
+    }
+  }
+
+  if (parts.length === 0) throw new Error("使える素材がありませんでした（動画がすべて非対応コーデックの可能性）");
+
+  // 連結
+  const listLines = parts.map((p) => `file '${p}'`);
+  await ffmpeg.writeFile("mixlist.txt", new TextEncoder().encode(listLines.join("\n")));
+  await ffmpeg.exec([
+    "-f", "concat", "-safe", "0",
+    "-i", "mixlist.txt",
+    "-c", "copy",
+    "mixed_video.mp4",
+  ]);
+
+  // BGM が無ければ無音のまま返す
+  if (!musicFile) {
+    const data = await ffmpeg.readFile("mixed_video.mp4");
+    const blob = new Blob([data], { type: "video/mp4" });
+    return { url: URL.createObjectURL(blob), skipped };
+  }
+
+  // BGM を乗せる
+  const t = musicFile.type;
+  const name = (musicFile as File).name || "";
+  const audioExt =
+    t.includes("mp4") || t.includes("m4a") || /\.m4a$/i.test(name) ? "m4a"
+    : t.includes("wav") || /\.wav$/i.test(name) ? "wav"
+    : "mp3";
+  await ffmpeg.writeFile(`bgm.${audioExt}`, await fetchFile(musicFile));
+  await ffmpeg.exec([
+    "-i", "mixed_video.mp4",
+    "-i", `bgm.${audioExt}`,
+    "-map", "0:v",
+    "-map", "1:a",
+    "-c:v", "copy",
+    "-c:a", "aac",
+    "-b:a", "192k",
+    "-shortest",
+    "mixed_final.mp4",
+  ]);
+  const data = await ffmpeg.readFile("mixed_final.mp4");
+  const blob = new Blob([data], { type: "video/mp4" });
+  console.log("合成完了:", blob.size, "bytes / スキップ:", skipped);
+  return { url: URL.createObjectURL(blob), skipped };
+}
