@@ -1,12 +1,15 @@
 import { FFmpeg } from "@ffmpeg/ffmpeg";
 import { fetchFile } from "@ffmpeg/util";
 
-async function loadFFmpeg(): Promise<FFmpeg> {
+async function loadFFmpeg(
+  onProgress?: (progress: number) => void
+): Promise<FFmpeg> {
   const ffmpeg = new FFmpeg();
   ffmpeg.on("log", ({ message }) => console.log("[ffmpeg]", message));
-  ffmpeg.on("progress", ({ progress }) =>
-    console.log("[progress]", Math.round(progress * 100) + "%")
-  );
+  ffmpeg.on("progress", ({ progress }) => {
+    console.log("[progress]", Math.round(progress * 100) + "%");
+    onProgress?.(progress);
+  });
   const origin = window.location.origin;
   console.log("LOAD: load()呼び出し直前");
   await ffmpeg.load({
@@ -599,10 +602,20 @@ export async function makeMixedMovieWithDucking(
   items: MixedItem[],
   musicFile: Blob | null,
   secondsPerImage = 2,
-  bgmVolume = 0.12
+  bgmVolume = 0.12,
+  onProgress?: (progress: number) => void
 ): Promise<{ url: string; skipped: number }> {
   if (items.length === 0) throw new Error("素材が0個です");
-  const ffmpeg = await loadFFmpeg();
+
+  // 全体進捗の正規化:exec1回ごとに 0→1 が来るので、全ステップ数で割って一方向に進める
+  const totalSteps = items.length + (musicFile ? 2 : 1);
+  let doneSteps = 0;
+  const report = (execProgress: number) => {
+    const overall = (doneSteps + Math.min(1, Math.max(0, execProgress))) / totalSteps;
+    onProgress?.(Math.min(1, overall));
+  };
+
+  const ffmpeg = await loadFFmpeg(report);
   const parts: string[] = [];
   let idx = 0;
   let skipped = 0;
@@ -613,7 +626,6 @@ export async function makeMixedMovieWithDucking(
       if (item.isVideo) {
         const inName = `mdvin${idx}.mp4`;
         await ffmpeg.writeFile(inName, await fetchFile(item.blob));
-        // 動画:映像正規化 + 音声をAACで残す(音が無くても無音トラックを付ける)
         await ffmpeg.exec([
           "-i", inName,
           "-f", "lavfi", "-t", "0.1", "-i", "anullsrc=channel_layout=stereo:sample_rate=48000",
@@ -630,7 +642,6 @@ export async function makeMixedMovieWithDucking(
         const prepared = await convertIfHeic(item.blob);
         const inName = `mdpin${idx}.jpg`;
         await ffmpeg.writeFile(inName, await fetchFile(prepared));
-        // 写真:無音トラックを付けて正規化(音声トラックを揃える)
         await ffmpeg.exec([
           "-loop", "1",
           "-i", inName,
@@ -645,9 +656,11 @@ export async function makeMixedMovieWithDucking(
         ]);
       }
       parts.push(outName);
+      doneSteps++;
       idx++;
     } catch (e) {
       console.warn("素材スキップ:", e);
+      doneSteps++;
       skipped++;
       idx++;
     }
@@ -664,11 +677,13 @@ export async function makeMixedMovieWithDucking(
     "-c:a", "aac",
     "mdmerged.mp4",
   ]);
+  doneSteps++;
 
   // BGMが無ければ、連結した(動画の声入り)動画をそのまま返す
   if (!musicFile) {
     const data = await ffmpeg.readFile("mdmerged.mp4");
     const blob = new Blob([data], { type: "video/mp4" });
+    onProgress?.(1);
     return { url: URL.createObjectURL(blob), skipped };
   }
 
@@ -693,9 +708,11 @@ export async function makeMixedMovieWithDucking(
     "-c:a", "aac", "-b:a", "192k",
     "mdfinal.mp4",
   ]);
+  doneSteps++;
 
   const data = await ffmpeg.readFile("mdfinal.mp4");
   const blob = new Blob([data], { type: "video/mp4" });
+  onProgress?.(1);
   console.log("ダッキング本番合成完了:", blob.size, "bytes / スキップ:", skipped);
   return { url: URL.createObjectURL(blob), skipped };
 }

@@ -45,6 +45,8 @@ export default function MovieMaker({
   const [errorMsg, setErrorMsg] = useState("");
   const [selectedIds, setSelectedIds] = useState<string[]>([]);
   const [saveState, setSaveState] = useState<"idle" | "saving" | "saved">("idle");
+  const [progress, setProgress] = useState(0);
+  const [progressLabel, setProgressLabel] = useState("");
 
   const photoInput = useRef<HTMLInputElement>(null);
   const musicInput = useRef<HTMLInputElement>(null);
@@ -138,10 +140,17 @@ export default function MovieMaker({
 
   const generate = async (withMusic: boolean) => {
     setStep("generating");
+    setProgress(0);
     setErrorMsg("");
     try {
       const items = photos.map((f) => ({ blob: f as Blob, isVideo: f.type.startsWith("video/") }));
-      const result = await makeMixedMovieWithDucking(items, withMusic && music ? music : null, 2, 0.12);
+      const result = await makeMixedMovieWithDucking(
+        items,
+        withMusic && music ? music : null,
+        2,
+        0.12,
+        (p) => setProgress(Math.max(0, Math.min(100, Math.round(p * 100))))
+      );
       setVideoUrl(result.url);
       if (result.skipped > 0) {
         console.warn(result.skipped + "件の動画は対応していない形式のためスキップしました");
@@ -297,6 +306,12 @@ export default function MovieMaker({
           <div style={S.center}>
             <div style={{ ...S.ornament, animation: "tn-pulse 1.6s ease-in-out infinite" }}>· · ·</div>
             <div style={S.lead}>生成中…</div>
+            <div style={{ width: "100%", maxWidth: 280, margin: "20px auto 8px" }}>
+              <div style={{ height: 1, background: "rgba(58,47,31,0.15)", position: "relative" }}>
+                <div style={{ position: "absolute", left: 0, top: 0, height: 1, width: progress + "%", background: "#8B7355", transition: "width 0.3s ease" }} />
+              </div>
+              <div style={{ textAlign: "right", marginTop: 8, fontFamily: "'Cormorant Garamond', serif", fontStyle: "italic", fontSize: 13, color: "#8B7355", letterSpacing: "0.1em" }}>{progress}%</div>
+            </div>
             <div style={S.hint}>
               ブラウザ内で動画を書き出しています。<br />
               枚数によっては少し時間がかかります。このまま閉じずにお待ちください。
