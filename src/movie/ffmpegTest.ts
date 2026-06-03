@@ -603,9 +603,11 @@ export async function makeMixedMovieWithDucking(
   musicFile: Blob | null,
   secondsPerImage = 2,
   bgmVolume = 0.12,
-  onProgress?: (progress: number) => void
+  onProgress?: (progress: number) => void,
+  onPhase?: (label: string) => void
 ): Promise<{ url: string; skipped: number }> {
   if (items.length === 0) throw new Error("素材が0個です");
+  onPhase?.("素材を準備しています");
 
   // 全体進捗の正規化:exec1回ごとに 0→1 が来るので、全ステップ数で割って一方向に進める
   const totalSteps = items.length + (musicFile ? 2 : 1);
@@ -668,6 +670,7 @@ export async function makeMixedMovieWithDucking(
   if (parts.length === 0) throw new Error("使える素材がありませんでした");
 
   // 連結(映像コピー、音声はAAC再エンコードで揃える)
+  onPhase?.("つなぎ合わせています");
   const listLines = parts.map((p) => `file '${p}'`);
   await ffmpeg.writeFile("mdlist.txt", new TextEncoder().encode(listLines.join("\n")));
   await ffmpeg.exec([
@@ -697,6 +700,7 @@ export async function makeMixedMovieWithDucking(
   await ffmpeg.writeFile(`mdbgm.${audioExt}`, await fetchFile(musicFile));
 
   // 連結音声(動画の声)を1.5倍、BGMをbgmVolume倍、normalize=0 で混ぜる
+  onPhase?.("仕上げています");
   await ffmpeg.exec([
     "-i", "mdmerged.mp4",
     "-i", `mdbgm.${audioExt}`,

@@ -141,6 +141,7 @@ export default function MovieMaker({
   const generate = async (withMusic: boolean) => {
     setStep("generating");
     setProgress(0);
+    setProgressLabel("");
     setErrorMsg("");
     try {
       const items = photos.map((f) => ({ blob: f as Blob, isVideo: f.type.startsWith("video/") }));
@@ -149,7 +150,8 @@ export default function MovieMaker({
         withMusic && music ? music : null,
         2,
         0.12,
-        (p) => setProgress(Math.max(0, Math.min(100, Math.round(p * 100))))
+        (p) => setProgress(Math.max(0, Math.min(100, Math.round(p * 100)))),
+        (label) => setProgressLabel(label)
       );
       setVideoUrl(result.url);
       if (result.skipped > 0) {
@@ -306,6 +308,9 @@ export default function MovieMaker({
           <div style={S.center}>
             <div style={{ ...S.ornament, animation: "tn-pulse 1.6s ease-in-out infinite" }}>· · ·</div>
             <div style={S.lead}>生成中…</div>
+            {progressLabel && (
+              <div style={{ fontFamily: "'Noto Serif JP', serif", fontWeight: 300, fontSize: 12, color: "#8B7355", letterSpacing: "0.08em", marginTop: 6 }}>{progressLabel}</div>
+            )}
             <div style={{ width: "100%", maxWidth: 280, margin: "20px auto 8px" }}>
               <div style={{ height: 1, background: "rgba(58,47,31,0.15)", position: "relative" }}>
                 <div style={{ position: "absolute", left: 0, top: 0, height: 1, width: progress + "%", background: "#8B7355", transition: "width 0.3s ease" }} />
