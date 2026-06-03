@@ -362,7 +362,57 @@ export async function testConcatWithMusic(
 // ───────── 本番用:写真+動画を撮影日時順に1本へ合成(BGM付き、動画の音は当面なし) ─────────
 // items: { blob, isVideo } の配列(呼び出し側で takenAt 順に並べて渡す)
 // HEVC等で変換に失敗した動画はスキップし、残りで続行する。
-export type MixedItem = { blob: Blob; isVideo: boolean };
+export type MixedItem = { blob: Blob; isVideo: boolean; takenAt?: string };
+
+// ───────── テキストオーバーレイPNG生成(Kinfolkトーン:明朝・白文字・薄い影) ─────────
+// 1280x720 の透明キャンバスにテキストを描き、PNG(Uint8Array)で返す。
+// 文字が無い(空文字)の場合は null を返す。
+async function makeTextOverlayPNG(text: string): Promise<Uint8Array | null> {
+  if (!text) return null;
+  const W = 1280, H = 720;
+  const canvas = document.createElement("canvas");
+  canvas.width = W;
+  canvas.height = H;
+  const ctx = canvas.getContext("2d");
+  if (!ctx) return null;
+
+  // 明朝系・斜体・白文字・薄い影。画面下寄せ・右寄り。
+  ctx.font = "italic 32px 'Noto Serif JP', 'Yu Mincho', serif";
+  ctx.textAlign = "right";
+  ctx.textBaseline = "alphabetic";
+  ctx.shadowColor = "rgba(0,0,0,0.45)";
+  ctx.shadowBlur = 8;
+  ctx.shadowOffsetX = 0;
+  ctx.shadowOffsetY = 1;
+  ctx.fillStyle = "rgba(255,255,255,0.92)";
+  // 余白:右48px / 下56px
+  ctx.fillText(text, W - 48, H - 56);
+
+  const blob: Blob = await new Promise((resolve) =>
+    canvas.toBlob((b) => resolve(b as Blob), "image/png")
+  );
+  const buf = new Uint8Array(await blob.arrayBuffer());
+  return buf;
+}
+
+// takenAt(ISO文字列)を "28 Jun · 18:42" 形式へ。timezone があれば現地時間で。
+function formatStamp(takenAt?: string, timezone?: string): string {
+  if (!takenAt) return "";
+  const d = new Date(takenAt);
+  if (isNaN(d.getTime())) return "";
+  try {
+    const opt: Intl.DateTimeFormatOptions = {
+      day: "2-digit", month: "short", hour: "2-digit", minute: "2-digit",
+      hour12: false, timeZone: timezone || undefined,
+    };
+    const parts = new Intl.DateTimeFormat("en-GB", opt).formatToParts(d);
+    const get = (t: string) => parts.find((p) => p.type === t)?.value || "";
+    return `${get("day")} ${get("month")} · ${get("hour")}:${get("minute")}`;
+  } catch {
+    return "";
+  }
+}
+
 export async function makeMixedMovie(
   items: MixedItem[],
   musicFile: Blob | null,
@@ -604,7 +654,8 @@ export async function makeMixedMovieWithDucking(
   secondsPerImage = 2,
   bgmVolume = 0.12,
   onProgress?: (progress: number) => void,
-  onPhase?: (label: string) => void
+  onPhase?: (label: string) => void,
+  timezone?: string
 ): Promise<{ url: string; skipped: number }> {
   if (items.length === 0) throw new Error("素材が0個です");
   onPhase?.("素材を準備しています");
@@ -644,18 +695,45 @@ export async function makeMixedMovieWithDucking(
         const prepared = await convertIfHeic(item.blob);
         const inName = `mdpin${idx}.jpg`;
         await ffmpeg.writeFile(inName, await fetchFile(prepared));
-        await ffmpeg.exec([
-          "-loop", "1",
-          "-i", inName,
-          "-f", "lavfi", "-i", "anullsrc=channel_layout=stereo:sample_rate=48000",
-          "-t", String(secondsPerImage),
-          "-r", "30",
-          "-vf", "scale=1280:720:force_original_aspect_ratio=decrease,pad=1280:720:(ow-iw)/2:(oh-ih)/2:color=black,format=yuv420p",
-          "-c:v", "libx264",
-          "-c:a", "aac", "-ar", "48000", "-ac", "2",
-          "-shortest",
-          outName,
-        ]);
+
+        // 日付スタンプのテキストPNGを用意(takenAt があれば)
+        const stamp = formatStamp(item.takenAt, timezone);
+        const overlayPng = await makeTextOverlayPNG(stamp);
+        const baseVf = "scale=1280:720:force_original_aspect_ratio=decrease,pad=1280:720:(ow-iw)/2:(oh-ih)/2:color=black,format=yuv420p";
+
+        if (overlayPng) {
+          const txtName = `mdtxt${idx}.png`;
+          await ffmpeg.writeFile(txtName, overlayPng);
+          await ffmpeg.exec([
+            "-loop", "1",
+            "-i", inName,
+            "-f", "lavfi", "-i", "anullsrc=channel_layout=stereo:sample_rate=48000",
+            "-i", txtName,
+            "-t", String(secondsPerImage),
+            "-r", "30",
+            "-filter_complex",
+            `[0:v]${baseVf}[bg];[bg][2:v]overlay=0:0:format=auto[v]`,
+            "-map", "[v]",
+            "-map", "1:a",
+            "-c:v", "libx264",
+            "-c:a", "aac", "-ar", "48000", "-ac", "2",
+            "-shortest",
+            outName,
+          ]);
+        } else {
+          await ffmpeg.exec([
+            "-loop", "1",
+            "-i", inName,
+            "-f", "lavfi", "-i", "anullsrc=channel_layout=stereo:sample_rate=48000",
+            "-t", String(secondsPerImage),
+            "-r", "30",
+            "-vf", baseVf,
+            "-c:v", "libx264",
+            "-c:a", "aac", "-ar", "48000", "-ac", "2",
+            "-shortest",
+            outName,
+          ]);
+        }
       }
       parts.push(outName);
       doneSteps++;

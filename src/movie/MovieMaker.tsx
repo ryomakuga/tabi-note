@@ -131,9 +131,11 @@ export default function MovieMaker({
   const confirmAppPhotos = () => {
     const chosen = boxPhotos.filter((p) => selectedIds.includes(p.id));
     chosen.sort((a, b) => a.takenAt.localeCompare(b.takenAt));
-    const files = chosen.map(
-      (p) => new File([p.blob], p.filename || `${p.id}.jpg`, { type: p.blob.type || "image/jpeg" })
-    );
+    const files = chosen.map((p) => {
+      const file = new File([p.blob], p.filename || `${p.id}.jpg`, { type: p.blob.type || "image/jpeg" });
+      (file as any).takenAt = p.takenAt;
+      return file;
+    });
     setPhotos(files);
     setStep("music");
   };
@@ -144,7 +146,7 @@ export default function MovieMaker({
     setProgressLabel("");
     setErrorMsg("");
     try {
-      const items = photos.map((f) => ({ blob: f as Blob, isVideo: f.type.startsWith("video/") }));
+      const items = photos.map((f) => ({ blob: f as Blob, isVideo: f.type.startsWith("video/"), takenAt: (f as any).takenAt as string | undefined }));
       const result = await makeMixedMovieWithDucking(
         items,
         withMusic && music ? music : null,
