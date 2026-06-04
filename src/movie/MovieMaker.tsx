@@ -5,6 +5,7 @@ import {
   makeSlideshowFromBlobs,
   makeMixedMovie,
   makeMixedMovieWithDucking,
+  makeCoverPNG,
   downloadVideo,
 } from "./ffmpegTest";
 import { usePhotosStore } from "../lib/photos-store";
@@ -47,6 +48,7 @@ export default function MovieMaker({
   const [saveState, setSaveState] = useState<"idle" | "saving" | "saved">("idle");
   const [progress, setProgress] = useState(0);
   const [progressLabel, setProgressLabel] = useState("");
+  const [movieTitle, setMovieTitle] = useState("");
 
   const photoInput = useRef<HTMLInputElement>(null);
   const musicInput = useRef<HTMLInputElement>(null);
@@ -146,7 +148,11 @@ export default function MovieMaker({
     setProgressLabel("");
     setErrorMsg("");
     try {
-      const items = photos.map((f) => ({ blob: f as Blob, isVideo: f.type.startsWith("video/"), takenAt: (f as any).takenAt as string | undefined }));
+      const items: { blob: Blob; isVideo: boolean; takenAt?: string }[] = photos.map((f) => ({ blob: f as Blob, isVideo: f.type.startsWith("video/"), takenAt: (f as any).takenAt as string | undefined }));
+      if (movieTitle.trim()) {
+        const cover = await makeCoverPNG(movieTitle.trim());
+        if (cover) items.unshift({ blob: cover, isVideo: false });
+      }
       const result = await makeMixedMovieWithDucking(
         items,
         withMusic && music ? music : null,
@@ -297,6 +303,20 @@ export default function MovieMaker({
               一度読み込んだ曲は保存され、次回から上の一覧で選べます。
             </div>
 
+            <div style={S.sitesLabel}>— オープニングタイトル(任意)</div>
+            <input
+              type="text"
+              value={movieTitle}
+              onChange={(e) => setMovieTitle(e.target.value)}
+              placeholder="例:Đà Nẵng 2026(空欄なら表紙なし)"
+              style={{
+                width: "100%", padding: "12px 14px", marginTop: 6,
+                background: "rgba(255,255,255,0.5)", border: "1px solid rgba(58,47,31,0.2)",
+                fontFamily: "'Noto Serif JP', serif", fontWeight: 300, fontSize: 14,
+                color: "#3A2F1F", letterSpacing: "0.05em", outline: "none", borderRadius: 2,
+                boxSizing: "border-box",
+              }}
+            />
             <button style={{ ...S.solidBtn, opacity: music ? 1 : 0.35 }}
               disabled={!music} onClick={() => generate(true)}>
               ムービーを作成 —

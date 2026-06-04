@@ -395,6 +395,52 @@ async function makeTextOverlayPNG(text: string): Promise<Uint8Array | null> {
   return buf;
 }
 
+// ───────── 表紙カットPNG生成(Kinfolkトーン:ベージュ背景・セリフ体タイトル) ─────────
+// 1280x720 のベージュ背景にタイトルを中央配置して PNG Blob で返す。
+export async function makeCoverPNG(title: string): Promise<Blob | null> {
+  if (!title) return null;
+  const W = 1280, H = 720;
+  const canvas = document.createElement("canvas");
+  canvas.width = W;
+  canvas.height = H;
+  const ctx = canvas.getContext("2d");
+  if (!ctx) return null;
+
+  // 背景:ウォームベージュ
+  ctx.fillStyle = "#ECE5D8";
+  ctx.fillRect(0, 0, W, H);
+
+  // 上の小さなブランド行
+  ctx.fillStyle = "#8B7355";
+  ctx.font = "300 18px 'Cormorant Garamond', 'Noto Serif JP', serif";
+  ctx.textAlign = "center";
+  ctx.textBaseline = "middle";
+  ctx.fillText("— T A B I   N O T E —", W / 2, H / 2 - 110);
+
+  // タイトル(長い場合は縮小)
+  let size = 72;
+  ctx.font = `300 ${size}px 'Cormorant Garamond', 'Noto Serif JP', serif`;
+  while (ctx.measureText(title).width > W - 200 && size > 28) {
+    size -= 4;
+    ctx.font = `300 ${size}px 'Cormorant Garamond', 'Noto Serif JP', serif`;
+  }
+  ctx.fillStyle = "#3A2F1F";
+  ctx.fillText(title, W / 2, H / 2);
+
+  // 下の細い区切り線
+  ctx.strokeStyle = "rgba(58, 47, 31, 0.3)";
+  ctx.lineWidth = 1;
+  ctx.beginPath();
+  ctx.moveTo(W / 2 - 80, H / 2 + 90);
+  ctx.lineTo(W / 2 + 80, H / 2 + 90);
+  ctx.stroke();
+
+  const blob: Blob | null = await new Promise((resolve) =>
+    canvas.toBlob((b) => resolve(b), "image/jpeg", 0.95)
+  );
+  return blob;
+}
+
 // takenAt(ISO文字列)を "28 Jun · 18:42" 形式へ。timezone があれば現地時間で。
 function formatStamp(takenAt?: string, timezone?: string): string {
   if (!takenAt) return "";
@@ -754,7 +800,9 @@ export async function makeMixedMovieWithDucking(
   await ffmpeg.exec([
     "-f", "concat", "-safe", "0",
     "-i", "mdlist.txt",
-    "-c:v", "copy",
+    "-r", "30",
+    "-c:v", "libx264",
+    "-pix_fmt", "yuv420p",
     "-c:a", "aac",
     "mdmerged.mp4",
   ]);
