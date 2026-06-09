@@ -362,13 +362,23 @@ export async function testConcatWithMusic(
 // ───────── 本番用:写真+動画を撮影日時順に1本へ合成(BGM付き、動画の音は当面なし) ─────────
 // items: { blob, isVideo } の配列(呼び出し側で takenAt 順に並べて渡す)
 // HEVC等で変換に失敗した動画はスキップし、残りで続行する。
-export type MixedItem = { blob: Blob; isVideo: boolean; takenAt?: string };
+export type MixedItem = { blob: Blob; isVideo: boolean; takenAt?: string; caption?: { jp?: string; en?: string } | string; spot?: string };
 
 // ───────── テキストオーバーレイPNG生成(Kinfolkトーン:明朝・白文字・薄い影) ─────────
 // 1280x720 の透明キャンバスにテキストを描き、PNG(Uint8Array)で返す。
 // 文字が無い(空文字)の場合は null を返す。
-async function makeTextOverlayPNG(text: string): Promise<Uint8Array | null> {
-  if (!text) return null;
+async function makeTextOverlayPNG(
+  text: string,
+  caption?: { jp?: string; en?: string } | string,
+  spot?: string
+): Promise<Uint8Array | null> {
+  const cap =
+    typeof caption === "string" ? { jp: caption, en: undefined } : caption || {};
+  const jp = cap.jp?.trim() || "";
+  const en = cap.en?.trim() || "";
+  const spotName = spot?.trim() || "";
+  if (!text && !jp && !en && !spotName) return null;
+
   const W = 1280, H = 720;
   const canvas = document.createElement("canvas");
   canvas.width = W;
@@ -376,18 +386,62 @@ async function makeTextOverlayPNG(text: string): Promise<Uint8Array | null> {
   const ctx = canvas.getContext("2d");
   if (!ctx) return null;
 
-  // 明朝系・斜体・白文字・薄い影。画面下寄せ・右寄り。
-  ctx.font = "italic 32px 'Noto Serif JP', 'Yu Mincho', serif";
+  const MX = 64;
+  const MB = 72;
   ctx.textAlign = "right";
   ctx.textBaseline = "alphabetic";
-  ctx.shadowColor = "rgba(0,0,0,0.45)";
-  ctx.shadowBlur = 8;
+  ctx.shadowColor = "rgba(0,0,0,0.40)";
+  ctx.shadowBlur = 10;
   ctx.shadowOffsetX = 0;
   ctx.shadowOffsetY = 1;
-  ctx.fillStyle = "rgba(255,255,255,0.92)";
-  // 余白:右48px / 下56px
-  ctx.fillText(text, W - 48, H - 56);
 
+  // キャプション(jp/en):画面下・中央寄せに流す
+  if (jp || en) {
+    ctx.textAlign = "center";
+    const cx = W / 2;
+    let cy = H - MB;
+    if (jp) {
+      ctx.shadowColor = "rgba(0,0,0,0.45)";
+      ctx.shadowBlur = 12;
+      ctx.font = "300 44px 'Noto Serif JP', 'Yu Mincho', serif";
+      ctx.fillStyle = "rgba(247,243,234,0.96)";
+      ctx.fillText(jp, cx, cy);
+      cy -= 34;
+    }
+    if (en) {
+      ctx.shadowColor = "transparent";
+      ctx.strokeStyle = "rgba(201,168,106,0.85)";
+      ctx.lineWidth = 1;
+      ctx.beginPath();
+      ctx.moveTo(cx - 28, cy - 6);
+      ctx.lineTo(cx + 28, cy - 6);
+      ctx.stroke();
+      cy -= 22;
+      ctx.shadowColor = "rgba(0,0,0,0.40)";
+      ctx.font = "300 22px 'Cormorant Garamond', 'Noto Serif JP', serif";
+      ctx.fillStyle = "rgba(201,168,106,0.92)";
+      const spaced = en.split("").join(" ");
+      ctx.fillText(spaced, cx, cy);
+    }
+  }
+  // スポット名 + 日付:右下に固定
+  ctx.textAlign = "right";
+  let ry = H - MB;
+  if (text) {
+    ctx.shadowColor = "rgba(0,0,0,0.40)";
+    ctx.shadowBlur = 10;
+    ctx.font = "italic 24px 'Noto Serif JP', 'Yu Mincho', serif";
+    ctx.fillStyle = "rgba(247,243,234,0.78)";
+    ctx.fillText(text, W - MX, ry);
+    ry -= 34;
+  }
+  if (spotName) {
+    ctx.shadowColor = "rgba(0,0,0,0.45)";
+    ctx.shadowBlur = 10;
+    ctx.font = "300 30px 'Noto Serif JP', 'Yu Mincho', serif";
+    ctx.fillStyle = "rgba(247,243,234,0.92)";
+    ctx.fillText(spotName, W - MX, ry);
+  }
   const blob: Blob = await new Promise((resolve) =>
     canvas.toBlob((b) => resolve(b as Blob), "image/png")
   );
@@ -744,7 +798,7 @@ export async function makeMixedMovieWithDucking(
 
         // 日付スタンプのテキストPNGを用意(takenAt があれば)
         const stamp = formatStamp(item.takenAt, timezone);
-        const overlayPng = await makeTextOverlayPNG(stamp);
+        const overlayPng = await makeTextOverlayPNG(stamp, item.caption, item.spot);
         const baseVf = "scale=1280:720:force_original_aspect_ratio=decrease,pad=1280:720:(ow-iw)/2:(oh-ih)/2:color=black,format=yuv420p";
 
         if (overlayPng) {

@@ -9,6 +9,7 @@ import {
   downloadVideo,
 } from "./ffmpegTest";
 import { usePhotosStore } from "../lib/photos-store";
+import { useSpotsStore } from "../lib/spots-store";
 import { useMusicStore } from "../lib/music-store";
 import { useMoviesStore } from "../lib/movies-store";
 import type { Photo, MusicTrack } from "../lib/types";
@@ -49,12 +50,16 @@ export default function MovieMaker({
   const [progress, setProgress] = useState(0);
   const [progressLabel, setProgressLabel] = useState("");
   const [movieTitle, setMovieTitle] = useState("");
+  const [captions, setCaptions] = useState<Record<number, { jp?: string; en?: string }>>({});
+  const [spotNames, setSpotNames] = useState<Record<number, string>>({});
 
   const photoInput = useRef<HTMLInputElement>(null);
   const musicInput = useRef<HTMLInputElement>(null);
 
   // 写真ボックス(全写真のうち、この旅行ぶん)
   const loadPhotos = usePhotosStore((s) => s.loadPhotos);
+  const loadSpots = useSpotsStore((s) => s.loadSpots);
+  const spots = useSpotsStore((s) => s.spots);
   const allPhotos = usePhotosStore((s) => s.photos);
   const boxPhotos = allPhotos.filter((p) => p.tripId === tripId);
 
@@ -68,9 +73,9 @@ export default function MovieMaker({
   const addMovie = useMoviesStore((s) => s.addMovie);
 
   useEffect(() => {
-    if (open && tripId) loadPhotos(tripId);
+    if (open && tripId) { loadPhotos(tripId); loadSpots(tripId); }
     if (open) loadTracks();
-  }, [open, tripId, loadPhotos, loadTracks]);
+  }, [open, tripId, loadPhotos, loadSpots, loadTracks]);
 
   if (!open) return null;
 
@@ -148,7 +153,7 @@ export default function MovieMaker({
     setProgressLabel("");
     setErrorMsg("");
     try {
-      const items: { blob: Blob; isVideo: boolean; takenAt?: string }[] = photos.map((f) => ({ blob: f as Blob, isVideo: f.type.startsWith("video/"), takenAt: (f as any).takenAt as string | undefined }));
+      const items: { blob: Blob; isVideo: boolean; takenAt?: string; caption?: { jp?: string; en?: string }; spot?: string }[] = photos.map((f, i) => ({ blob: f as Blob, isVideo: f.type.startsWith("video/"), takenAt: (f as any).takenAt as string | undefined, caption: captions[i], spot: spotNames[i]?.trim() || undefined }));
       if (movieTitle.trim()) {
         const cover = await makeCoverPNG(movieTitle.trim());
         if (cover) items.unshift({ blob: cover, isVideo: false });
@@ -317,6 +322,35 @@ export default function MovieMaker({
                 boxSizing: "border-box",
               }}
             />
+            <div style={S.sitesLabel}>— キャプション(任意)</div>
+            <div style={{ fontFamily: "'Noto Serif JP', serif", fontWeight: 300, fontSize: 11, color: "#8B7355", letterSpacing: "0.05em", marginTop: 4, lineHeight: 1.7 }}>
+              写真ごとに一言を添えられます(空欄なら日付だけ)。
+            </div>
+            {photos.map((f, i) => {
+              if (f.type.startsWith("video/")) return null;
+              return (
+                <div key={i} style={{ display: "flex", gap: 10, alignItems: "center", marginTop: 12 }}>
+                  <img src={URL.createObjectURL(f)} alt="" style={{ width: 52, height: 52, objectFit: "cover", flexShrink: 0, borderRadius: 2 }} />
+                  <div style={{ flex: 1, minWidth: 0 }}>
+                    <input type="text" value={captions[i]?.jp || ""}
+                      onChange={(e) => setCaptions((c) => ({ ...c, [i]: { ...c[i], jp: e.target.value } }))}
+                      placeholder="例:海岸通りの夕暮れ"
+                      style={{ width: "100%", padding: "8px 10px", background: "rgba(255,255,255,0.5)", border: "1px solid rgba(58,47,31,0.2)", fontFamily: "'Noto Serif JP', serif", fontWeight: 300, fontSize: 13, color: "#3A2F1F", letterSpacing: "0.05em", outline: "none", borderRadius: 2, boxSizing: "border-box" }} />
+                    <input type="text" value={captions[i]?.en || ""}
+                      onChange={(e) => setCaptions((c) => ({ ...c, [i]: { ...c[i], en: e.target.value } }))}
+                      placeholder="英字(任意) 例:evening glow"
+                      style={{ width: "100%", padding: "6px 10px", marginTop: 4, background: "rgba(255,255,255,0.35)", border: "1px solid rgba(58,47,31,0.15)", fontFamily: "'Cormorant Garamond', serif", fontStyle: "italic", fontSize: 12, color: "#8B7355", letterSpacing: "0.08em", outline: "none", borderRadius: 2, boxSizing: "border-box" }} />
+                    {spots.length > 0 && (
+                      <select value={spotNames[i] || ""} onChange={(e) => setSpotNames((c) => ({ ...c, [i]: e.target.value }))}
+                        style={{ width: "100%", padding: "6px 8px", marginTop: 4, background: "rgba(255,255,255,0.35)", border: "1px solid rgba(58,47,31,0.15)", fontFamily: "'Noto Serif JP', serif", fontWeight: 300, fontSize: 11.5, color: "#8B7355", letterSpacing: "0.04em", outline: "none", borderRadius: 2, boxSizing: "border-box" }}>
+                        <option value="">— スポットから選ぶ</option>
+                        {spots.map((sp) => (<option key={sp.id} value={sp.name}>{sp.name}{sp.nameLocal ? ` / ${sp.nameLocal}` : ""}</option>))}
+                      </select>
+                    )}
+                  </div>
+                </div>
+              );
+            })}
             <button style={{ ...S.solidBtn, opacity: music ? 1 : 0.35 }}
               disabled={!music} onClick={() => generate(true)}>
               ムービーを作成 —

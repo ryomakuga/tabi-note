@@ -951,3 +951,36 @@ Safari は LAN IP の http:// を Insecure Context と判定し、Web Crypto API
 - 動画の全画面詳細表示(まだ img)
 
 出発まで:あと 27 日
+
+---
+
+## 2026-06-06 テロップ(キャプション)を上品な2段組デザイン化
+
+### 目標
+動画のテロップを旅アプリ/Vlog風に。写真ごとのキャプションを
+**英字(小さめ・ゴールド・字間広め) + 細い罫線 + 日本語(生成り色・明朝)** の2段組で表示する。
+
+### 完了(全ステップ成功済み)
+- **`src/movie/ffmpegTest.ts`**: `makeTextOverlayPNG`(370行〜)を丸ごと差し替え。
+  - 引数 `caption` を `{ jp?: string; en?: string } | string` に(文字列も後方互換でOK)。
+  - Canvas描画を 日本語(生成り `#F7F3EA`・明朝) + ゴールド罫線(`#C9A86A`) + 英字(ゴールド・字間 `\u2009`) の2段組に。
+  - 日時スタンプ(text)は控えめに維持。配置は右下、余白(右64px/下72px)。
+- **`src/movie/MovieMaker.tsx`**: 
+  - 53行: `captions` の state を `Record<number, string>` → `Record<number, { jp?: string; en?: string }>`。
+  - 155行付近: `items[].caption` の型と渡し方を `{ jp, en }` に。
+  - 340/341/355行: 日本語入力の value/onChange、スポット選択の onChange を `{ ...c[i], jp: ... }` 形式に。
+  - 日本語入力欄の直後に 英字(en)用 `<input>` を追加(placeholder: `英字(任意) 例:evening glow`)。
+
+### 次回やること
+1. ブラウザ(`https://localhost:5173/`)で動作確認。
+   ムービー機能 → 写真選択 → キャプション画面で「日本語」欄と「英字(任意)」欄の **2つ** が出るか。
+2. 両方入力して短い動画を1本書き出し、テロップの見た目(英字+ゴールド線+日本語)を確認。
+3. 気になる点(位置/サイズ/色/線の長さ)を1つずつ微調整。
+
+### 注意・メモ
+- ビルドエラー `makeMixedMovie has already been declared` を一瞬心配したが **誤検知**。
+  `makeMixedMovie` と `makeMixedMovieWithDucking` は別物で import 重複なし。最新の `npm run dev` は正常 `ready`。
+- 別途 `captionMaker.ts`(ffmpeg drawtext版 + 余白自動判定 `pickBestPosition`)も作成済みだが、今回は Canvas方式で実装したため未使用。将来の参考用。
+- コード差し替えは「ターミナルに貼る Python パッチ」方式で実施。手編集より安全だった。
+- まだ commit していない。次回、動作確認後にコミット推奨。
+
