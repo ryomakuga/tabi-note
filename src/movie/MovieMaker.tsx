@@ -161,7 +161,7 @@ export default function MovieMaker({
       const result = await makeMixedMovieWithDucking(
         items,
         withMusic && music ? music : null,
-        2,
+        4.5,
         0.12,
         (p) => setProgress(Math.max(0, Math.min(100, Math.round(p * 100)))),
         (label) => setProgressLabel(label)

@@ -751,7 +751,7 @@ export async function testDuckSingle(
 export async function makeMixedMovieWithDucking(
   items: MixedItem[],
   musicFile: Blob | null,
-  secondsPerImage = 2,
+  secondsPerImage = 4.5,
   bgmVolume = 0.12,
   onProgress?: (progress: number) => void,
   onPhase?: (label: string) => void,
@@ -799,7 +799,8 @@ export async function makeMixedMovieWithDucking(
         // 日付スタンプのテキストPNGを用意(takenAt があれば)
         const stamp = formatStamp(item.takenAt, timezone);
         const overlayPng = await makeTextOverlayPNG(stamp, item.caption, item.spot);
-        const baseVf = "scale=1280:720:force_original_aspect_ratio=decrease,pad=1280:720:(ow-iw)/2:(oh-ih)/2:color=black,format=yuv420p";
+        const zpFrames = Math.max(1, Math.round(secondsPerImage * 30));
+        const baseVf = `scale=2560:1440:force_original_aspect_ratio=decrease,pad=2560:1440:(ow-iw)/2:(oh-ih)/2:color=black,zoompan=z='min(1.08,1+0.08*on/${zpFrames})':x='iw/2-(iw/zoom/2)':y='ih/2-(ih/zoom/2)':d=${zpFrames}:s=1280x720:fps=30,format=yuv420p`;
 
         if (overlayPng) {
           const txtName = `mdtxt${idx}.png`;
@@ -812,7 +813,8 @@ export async function makeMixedMovieWithDucking(
             "-t", String(secondsPerImage),
             "-r", "30",
             "-filter_complex",
-            `[0:v]${baseVf}[bg];[bg][2:v]overlay=0:0:format=auto[v]`,
+            `[0:v]${baseVf}[bg];` +
+            `[bg][2:v]overlay=0:0:format=auto[v]`,
             "-map", "[v]",
             "-map", "1:a",
             "-c:v", "libx264",
