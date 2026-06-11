@@ -779,18 +779,41 @@ export async function makeMixedMovieWithDucking(
       if (item.isVideo) {
         const inName = `mdvin${idx}.mp4`;
         await ffmpeg.writeFile(inName, await fetchFile(item.blob));
-        await ffmpeg.exec([
-          "-i", inName,
-          "-f", "lavfi", "-t", "0.1", "-i", "anullsrc=channel_layout=stereo:sample_rate=48000",
-          "-map", "0:v:0",
-          "-map", "0:a:0?",
-          "-r", "30",
-          "-vf", "scale=1280:720:force_original_aspect_ratio=decrease,pad=1280:720:(ow-iw)/2:(oh-ih)/2:color=black,format=yuv420p",
-          "-c:v", "libx264",
-          "-c:a", "aac", "-ar", "48000", "-ac", "2",
-          "-shortest",
-          outName,
-        ]);
+        const stampV = formatStamp(item.takenAt, timezone);
+        const overlayPngV = await makeTextOverlayPNG(stampV, item.caption, item.spot);
+        const vBase = "scale=1280:720:force_original_aspect_ratio=decrease,pad=1280:720:(ow-iw)/2:(oh-ih)/2:color=black,format=yuv420p";
+        if (overlayPngV) {
+          const txtNameV = `mdvtxt${idx}.png`;
+          await ffmpeg.writeFile(txtNameV, overlayPngV);
+          await ffmpeg.exec([
+            "-i", inName,
+            "-loop", "1", "-i", txtNameV,
+            "-f", "lavfi", "-i", "anullsrc=channel_layout=stereo:sample_rate=48000",
+            "-r", "30",
+            "-filter_complex",
+            `[0:v]${vBase}[bg];[bg][1:v]overlay=0:0:format=auto:shortest=1[v]`,
+            "-map", "[v]",
+            "-map", "0:a:0?",
+            "-map", "2:a:0",
+            "-c:v", "libx264",
+            "-c:a", "aac", "-ar", "48000", "-ac", "2",
+            "-shortest",
+            outName,
+          ]);
+        } else {
+          await ffmpeg.exec([
+            "-i", inName,
+            "-f", "lavfi", "-t", "0.1", "-i", "anullsrc=channel_layout=stereo:sample_rate=48000",
+            "-map", "0:v:0",
+            "-map", "0:a:0?",
+            "-r", "30",
+            "-vf", vBase,
+            "-c:v", "libx264",
+            "-c:a", "aac", "-ar", "48000", "-ac", "2",
+            "-shortest",
+            outName,
+          ]);
+        }
       } else {
         const prepared = await convertIfHeic(item.blob);
         const inName = `mdpin${idx}.jpg`;

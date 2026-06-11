@@ -327,10 +327,14 @@ export default function MovieMaker({
               写真ごとに一言を添えられます(空欄なら日付だけ)。
             </div>
             {photos.map((f, i) => {
-              if (f.type.startsWith("video/")) return null;
+              const isVid = f.type.startsWith("video/");
               return (
                 <div key={i} style={{ display: "flex", gap: 10, alignItems: "center", marginTop: 12 }}>
-                  <img src={URL.createObjectURL(f)} alt="" style={{ width: 52, height: 52, objectFit: "cover", flexShrink: 0, borderRadius: 2 }} />
+                  {isVid ? (
+                    <video src={URL.createObjectURL(f) + "#t=0.1"} muted preload="metadata" style={{ width: 52, height: 52, objectFit: "cover", flexShrink: 0, borderRadius: 2, background: "rgba(58,47,31,0.12)" }} />
+                  ) : (
+                    <img src={URL.createObjectURL(f)} alt="" style={{ width: 52, height: 52, objectFit: "cover", flexShrink: 0, borderRadius: 2 }} />
+                  )}
                   <div style={{ flex: 1, minWidth: 0 }}>
                     <input type="text" value={captions[i]?.jp || ""}
                       onChange={(e) => setCaptions((c) => ({ ...c, [i]: { ...c[i], jp: e.target.value } }))}
