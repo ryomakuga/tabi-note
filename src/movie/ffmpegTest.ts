@@ -748,6 +748,58 @@ export async function testDuckSingle(
 
 // ───────── 本番:写真+動画を連結し、動画の声を出しつつBGMをダッキング(段階6-3完成版) ─────────
 // 写真=無音, 動画=音声付き で正規化 → 連結 → 連結音声(動画の声)1.5倍 と BGM(bgmVolume倍)を normalize=0 で混ぜる。
+// 「文字だけがふわっと浮かび上がる」1カットを作る。
+// 同じ写真の【文字なし】と【文字あり】を作り、xfadeで繋ぐ。写真は同じなので文字だけが出現して見える。
+async function makeCaptionXfadeSeg(
+  ffmpeg: any,
+  inName: string,          // 写真ファイル名（書き込み済み）
+  txtName: string,         // キャプションPNGファイル名（書き込み済み）
+  outName: string,         // 出力seg名
+  secondsPerImage: number,
+  idx: number,
+): Promise<void> {
+  const zpFrames = Math.max(1, Math.round(secondsPerImage * 30));
+  const XF = 1.2;                                              // 文字が浮かび上がる時間（長め＝ゆっくり）
+  const HOLD = Math.max(0.4, Math.min(0.9, secondsPerImage * 0.18)); // 文字が出る前の間（短め＝早く出る）
+  const padVf = "scale=2560:1440:force_original_aspect_ratio=decrease,pad=2560:1440:(ow-iw)/2:(oh-ih)/2:color=black";
+  const zoomVf = `zoompan=z='min(1.08,1+0.08*on/${zpFrames})':x='iw/2-(iw/zoom/2)':y='ih/2-(ih/zoom/2)':d=${zpFrames}:s=1280x720:fps=30,format=yuv420p`;
+  const aDur = HOLD + XF;                                      // 文字なしパートの長さ
+  const bDur = Math.max(XF + 0.3, secondsPerImage - HOLD + XF); // 文字ありパートの長さ
+  // segA: 文字なし（頭に黒フェードイン）
+  await ffmpeg.exec([
+    "-loop", "1", "-i", inName,
+    "-f", "lavfi", "-i", "anullsrc=channel_layout=stereo:sample_rate=48000",
+    "-t", String(aDur), "-r", "30",
+    "-vf", `${padVf},${zoomVf},fade=t=in:st=0:d=0.5`,
+    "-c:v", "libx264", "-c:a", "aac", "-ar", "48000", "-ac", "2", "-shortest",
+    `xfA${idx}.mp4`,
+  ]);
+  // segB: 文字あり（末尾に黒フェードアウト）
+  await ffmpeg.exec([
+    "-loop", "1", "-i", inName,
+    "-f", "lavfi", "-i", "anullsrc=channel_layout=stereo:sample_rate=48000",
+    "-i", txtName,
+    "-t", String(bDur), "-r", "30",
+    "-filter_complex",
+    `[0:v]${padVf},${zoomVf}[bg];[bg][2:v]overlay=0:0:format=auto,fade=t=out:st=${Math.max(0.3, bDur - 0.5)}:d=0.5[v]`,
+    "-map", "[v]", "-map", "1:a",
+    "-c:v", "libx264", "-c:a", "aac", "-ar", "48000", "-ac", "2", "-shortest",
+    `xfB${idx}.mp4`,
+  ]);
+  // xfade: 文字なし→文字ありを溶かす ＝ 文字だけがふわっと出現
+  await ffmpeg.exec([
+    "-i", `xfA${idx}.mp4`,
+    "-i", `xfB${idx}.mp4`,
+    "-f", "lavfi", "-i", "anullsrc=channel_layout=stereo:sample_rate=48000",
+    "-filter_complex",
+    `[0:v][1:v]xfade=transition=smoothup:duration=${XF}:offset=${HOLD}[v]`,
+    "-map", "[v]", "-map", "2:a",
+    "-c:v", "libx264", "-c:a", "aac", "-ar", "48000", "-ac", "2", "-shortest",
+    outName,
+  ]);
+}
+
+
 export async function makeMixedMovieWithDucking(
   items: MixedItem[],
   musicFile: Blob | null,
@@ -785,19 +837,38 @@ export async function makeMixedMovieWithDucking(
         if (overlayPngV) {
           const txtNameV = `mdvtxt${idx}.png`;
           await ffmpeg.writeFile(txtNameV, overlayPngV);
+          // 動画も「文字だけゆっくり出現」: 文字なし版→文字あり版を xfade
+          const vXF = 1.2;   // 文字が浮かび上がる時間
+          const vHOLD = 1.2; // 文字が出る前の間
+          const vScale = "scale=1280:720:force_original_aspect_ratio=decrease,pad=1280:720:(ow-iw)/2:(oh-ih)/2:color=black,format=yuv420p";
+          // 文字なし版
+          await ffmpeg.exec([
+            "-i", inName,
+            "-f", "lavfi", "-i", "anullsrc=channel_layout=stereo:sample_rate=48000",
+            "-r", "30",
+            "-filter_complex", `[0:v]${vScale},fade=t=in:st=0:d=0.5[v]`,
+            "-map", "[v]", "-map", "0:a:0?", "-map", "1:a:0", "-shortest",
+            "-c:v", "libx264", "-c:a", "aac", "-ar", "48000", "-ac", "2",
+            `vxA${idx}.mp4`,
+          ]);
+          // 文字あり版
           await ffmpeg.exec([
             "-i", inName,
             "-loop", "1", "-i", txtNameV,
             "-f", "lavfi", "-i", "anullsrc=channel_layout=stereo:sample_rate=48000",
             "-r", "30",
-            "-filter_complex",
-            `[0:v]${vBase}[bg];[bg][1:v]overlay=0:0:format=auto:shortest=1[v]`,
-            "-map", "[v]",
-            "-map", "0:a:0?",
-            "-map", "2:a:0",
-            "-c:v", "libx264",
-            "-c:a", "aac", "-ar", "48000", "-ac", "2",
-            "-shortest",
+            "-filter_complex", `[0:v]${vScale}[bg];[bg][1:v]overlay=0:0:format=auto:shortest=1[v]`,
+            "-map", "[v]", "-map", "0:a:0?", "-map", "2:a:0", "-shortest",
+            "-c:v", "libx264", "-c:a", "aac", "-ar", "48000", "-ac", "2",
+            `vxB${idx}.mp4`,
+          ]);
+          // xfade で文字だけゆっくり出現
+          await ffmpeg.exec([
+            "-i", `vxA${idx}.mp4`,
+            "-i", `vxB${idx}.mp4`,
+            "-filter_complex", `[0:v][1:v]xfade=transition=smoothup:duration=${vXF}:offset=${vHOLD}[v];[0:a][1:a]acrossfade=d=${vXF}[a]`,
+            "-map", "[v]", "-map", "[a]",
+            "-c:v", "libx264", "-c:a", "aac", "-ar", "48000", "-ac", "2",
             outName,
           ]);
         } else {
@@ -828,23 +899,7 @@ export async function makeMixedMovieWithDucking(
         if (overlayPng) {
           const txtName = `mdtxt${idx}.png`;
           await ffmpeg.writeFile(txtName, overlayPng);
-          await ffmpeg.exec([
-            "-loop", "1",
-            "-i", inName,
-            "-f", "lavfi", "-i", "anullsrc=channel_layout=stereo:sample_rate=48000",
-            "-i", txtName,
-            "-t", String(secondsPerImage),
-            "-r", "30",
-            "-filter_complex",
-            `[0:v]${baseVf}[bg];` +
-            `[bg][2:v]overlay=0:0:format=auto[v]`,
-            "-map", "[v]",
-            "-map", "1:a",
-            "-c:v", "libx264",
-            "-c:a", "aac", "-ar", "48000", "-ac", "2",
-            "-shortest",
-            outName,
-          ]);
+          await makeCaptionXfadeSeg(ffmpeg, inName, txtName, outName, secondsPerImage, idx);
         } else {
           await ffmpeg.exec([
             "-loop", "1",
