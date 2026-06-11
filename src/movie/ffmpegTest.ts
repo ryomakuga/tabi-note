@@ -403,7 +403,7 @@ async function makeTextOverlayPNG(
     if (jp) {
       ctx.shadowColor = "rgba(0,0,0,0.45)";
       ctx.shadowBlur = 12;
-      ctx.font = "300 44px 'Noto Serif JP', 'Yu Mincho', serif";
+      ctx.font = "300 56px 'Noto Serif JP', 'Yu Mincho', serif";
       ctx.fillStyle = "rgba(247,243,234,0.96)";
       ctx.fillText(jp, cx, cy);
       cy -= 34;
@@ -418,7 +418,7 @@ async function makeTextOverlayPNG(
       ctx.stroke();
       cy -= 22;
       ctx.shadowColor = "rgba(0,0,0,0.40)";
-      ctx.font = "300 22px 'Cormorant Garamond', 'Noto Serif JP', serif";
+      ctx.font = "300 26px 'Cormorant Garamond', 'Noto Serif JP', serif";
       ctx.fillStyle = "rgba(201,168,106,0.92)";
       const spaced = en.split("").join(" ");
       ctx.fillText(spaced, cx, cy);
@@ -759,7 +759,7 @@ async function makeCaptionXfadeSeg(
   idx: number,
 ): Promise<void> {
   const zpFrames = Math.max(1, Math.round(secondsPerImage * 30));
-  const XF = 1.2;                                              // 文字が浮かび上がる時間（長め＝ゆっくり）
+  const XF = 2.4;                                              // 文字が浮かび上がる時間（長め＝ゆっくり）
   const HOLD = Math.max(0.4, Math.min(0.9, secondsPerImage * 0.18)); // 文字が出る前の間（短め＝早く出る）
   const padVf = "scale=2560:1440:force_original_aspect_ratio=decrease,pad=2560:1440:(ow-iw)/2:(oh-ih)/2:color=black";
   const zoomVf = `zoompan=z='min(1.08,1+0.08*on/${zpFrames})':x='iw/2-(iw/zoom/2)':y='ih/2-(ih/zoom/2)':d=${zpFrames}:s=1280x720:fps=30,format=yuv420p`;
@@ -792,7 +792,7 @@ async function makeCaptionXfadeSeg(
     "-i", `xfB${idx}.mp4`,
     "-f", "lavfi", "-i", "anullsrc=channel_layout=stereo:sample_rate=48000",
     "-filter_complex",
-    `[0:v][1:v]xfade=transition=smoothup:duration=${XF}:offset=${HOLD}[v]`,
+    `[0:v][1:v]xfade=transition=fade:duration=${XF}:offset=${HOLD}[v]`,
     "-map", "[v]", "-map", "2:a",
     "-c:v", "libx264", "-c:a", "aac", "-ar", "48000", "-ac", "2", "-shortest",
     outName,
@@ -838,7 +838,7 @@ export async function makeMixedMovieWithDucking(
           const txtNameV = `mdvtxt${idx}.png`;
           await ffmpeg.writeFile(txtNameV, overlayPngV);
           // 動画も「文字だけゆっくり出現」: 文字なし版→文字あり版を xfade
-          const vXF = 1.2;   // 文字が浮かび上がる時間
+          const vXF = 2.4;   // 文字が浮かび上がる時間
           const vHOLD = 1.2; // 文字が出る前の間
           const vScale = "scale=1280:720:force_original_aspect_ratio=decrease,pad=1280:720:(ow-iw)/2:(oh-ih)/2:color=black,format=yuv420p";
           // 文字なし版
@@ -866,7 +866,7 @@ export async function makeMixedMovieWithDucking(
           await ffmpeg.exec([
             "-i", `vxA${idx}.mp4`,
             "-i", `vxB${idx}.mp4`,
-            "-filter_complex", `[0:v][1:v]xfade=transition=smoothup:duration=${vXF}:offset=${vHOLD}[v];[0:a][1:a]acrossfade=d=${vXF}[a]`,
+            "-filter_complex", `[0:v][1:v]xfade=transition=fade:duration=${vXF}:offset=${vHOLD}[v];[0:a][1:a]acrossfade=d=${vXF}[a]`,
             "-map", "[v]", "-map", "[a]",
             "-c:v", "libx264", "-c:a", "aac", "-ar", "48000", "-ac", "2",
             outName,
