@@ -871,7 +871,7 @@ export async function makeMixedMovieWithDucking(
         const stamp = formatStamp(item.takenAt, timezone);
         const overlayPng = await makeTextOverlayPNG(stamp, item.caption, item.spot);
         const zpFrames = Math.max(1, Math.round(secondsPerImage * 30));
-        const baseVf = `scale=2560:1440:force_original_aspect_ratio=decrease,pad=2560:1440:(ow-iw)/2:(oh-ih)/2:color=black,zoompan=z='min(1.08,1+0.08*on/${zpFrames})':x='iw/2-(iw/zoom/2)':y='ih/2-(ih/zoom/2)':d=${zpFrames}:s=1280x720:fps=30,format=yuv420p,fade=t=in:st=0:d=0.5,fade=t=out:st=${Math.max(0.6, secondsPerImage - 0.5)}:d=0.5`;
+        const baseVf = `scale=1280:720:force_original_aspect_ratio=decrease,pad=1280:720:(ow-iw)/2:(oh-ih)/2:color=black,format=yuv420p,fade=t=in:st=0:d=0.5,fade=t=out:st=${Math.max(0.6, secondsPerImage - 0.5)}:d=0.5`;
 
         if (overlayPng) {
           const txtName = `mdtxt${idx}.png`;
