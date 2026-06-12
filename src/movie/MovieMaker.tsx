@@ -290,7 +290,7 @@ export default function MovieMaker({
               </div>
             )}
 
-            <input ref={musicInput} type="file" accept="audio/*"
+            <input ref={musicInput} type="file" accept="audio/*,.mp3,.m4a,.aac,.wav,.ogg,.flac"
               style={{ display: "none" }} onChange={pickMusic} />
             <button style={S.outlineBtn} onClick={() => musicInput.current?.click()}>
               ＋ 音楽ファイルを選ぶ（新しく読み込む）
@@ -331,7 +331,7 @@ export default function MovieMaker({
               return (
                 <div key={i} style={{ display: "flex", gap: 10, alignItems: "center", marginTop: 12 }}>
                   {isVid ? (
-                    <video src={URL.createObjectURL(f) + "#t=0.1"} muted preload="metadata" style={{ width: 52, height: 52, objectFit: "cover", flexShrink: 0, borderRadius: 2, background: "rgba(58,47,31,0.12)" }} />
+                    <video src={URL.createObjectURL(f) + "#t=0.1"} muted playsInline preload="metadata" onLoadedMetadata={(e) => { try { (e.currentTarget as HTMLVideoElement).currentTime = 0.1; } catch {} }} style={{ width: 52, height: 52, objectFit: "cover", flexShrink: 0, borderRadius: 2, background: "rgba(58,47,31,0.12)" }} />
                   ) : (
                     <img src={URL.createObjectURL(f)} alt="" style={{ width: 52, height: 52, objectFit: "cover", flexShrink: 0, borderRadius: 2 }} />
                   )}
@@ -432,7 +432,7 @@ function PhotoThumb({
   return (
     <button onClick={onClick} style={{ ...S.thumb, ...(selected ? S.thumbSel : {}) }}>
       {url && (isVideo ? (
-        <video src={`${url}#t=0.1`} style={S.thumbImg} muted playsInline preload="metadata" />
+        <video src={`${url}#t=0.1`} style={S.thumbImg} muted playsInline preload="metadata" onLoadedMetadata={(e) => { try { (e.currentTarget as HTMLVideoElement).currentTime = 0.1; } catch {} }} />
       ) : (
         <img src={url} alt={photo.filename} style={S.thumbImg} />
       ))}
