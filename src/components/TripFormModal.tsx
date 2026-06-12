@@ -200,7 +200,7 @@ export function TripFormModal({ trip, onClose }: TripFormModalProps) {
           )}
         </div>
 
-        <div className="px-8 py-5 border-t border-text-sub/10 flex items-center justify-end gap-3">
+        <div className="px-8 pt-5 pb-[calc(1.25rem+env(safe-area-inset-bottom))] border-t border-text-sub/10 flex items-center justify-end gap-3">
           <button
             onClick={onClose}
             disabled={isSubmitting}
