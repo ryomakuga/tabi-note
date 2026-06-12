@@ -4,6 +4,7 @@ import { useUIStore } from './lib/ui-store';
 import { LockScreen } from './components/LockScreen';
 import { TripsHome } from './components/TripsHome';
 import { TripDetail } from './components/TripDetail';
+import { InstallHint } from './components/InstallHint';
 
 function App() {
   const isLocked = useAuthStore((s) => s.isLocked);
@@ -17,15 +18,15 @@ function App() {
 
   // ロック中はロック画面、解錠後はメイン画面
   if (isLocked) {
-    return <LockScreen />;
+    return (<><LockScreen /><InstallHint /></>);
   }
 
   // selectedTripId があれば詳細画面、なければ一覧画面
   if (selectedTripId) {
-    return <TripDetail />;
+    return (<><TripDetail /><InstallHint /></>);
   }
 
-  return <TripsHome />;
+  return (<><TripsHome /><InstallHint /></>);
 }
 
 export default App;
