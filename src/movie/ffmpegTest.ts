@@ -837,37 +837,14 @@ export async function makeMixedMovieWithDucking(
         if (overlayPngV) {
           const txtNameV = `mdvtxt${idx}.png`;
           await ffmpeg.writeFile(txtNameV, overlayPngV);
-          // 動画も「文字だけゆっくり出現」: 文字なし版→文字あり版を xfade
-          const vXF = 2.4;   // 文字が浮かび上がる時間
-          const vHOLD = 1.2; // 文字が出る前の間
           const vScale = "scale=1280:720:force_original_aspect_ratio=decrease,pad=1280:720:(ow-iw)/2:(oh-ih)/2:color=black,format=yuv420p";
-          // 文字なし版
-          await ffmpeg.exec([
-            "-i", inName,
-            "-f", "lavfi", "-i", "anullsrc=channel_layout=stereo:sample_rate=48000",
-            "-r", "30",
-            "-filter_complex", `[0:v]${vScale},fade=t=in:st=0:d=0.5[v]`,
-            "-map", "[v]", "-map", "0:a:0?", "-map", "1:a:0", "-shortest",
-            "-c:v", "libx264", "-c:a", "aac", "-ar", "48000", "-ac", "2",
-            `vxA${idx}.mp4`,
-          ]);
-          // 文字あり版
           await ffmpeg.exec([
             "-i", inName,
             "-loop", "1", "-i", txtNameV,
             "-f", "lavfi", "-i", "anullsrc=channel_layout=stereo:sample_rate=48000",
             "-r", "30",
-            "-filter_complex", `[0:v]${vScale}[bg];[bg][1:v]overlay=0:0:format=auto:shortest=1[v]`,
+            "-filter_complex", `[0:v]${vScale},fade=t=in:st=0:d=0.5[bg];[1:v]format=rgba,fade=t=in:st=0.8:d=1.2:alpha=1[txt];[bg][txt]overlay=0:0:format=auto:shortest=1,format=yuv420p[v]`,
             "-map", "[v]", "-map", "0:a:0?", "-map", "2:a:0", "-shortest",
-            "-c:v", "libx264", "-c:a", "aac", "-ar", "48000", "-ac", "2",
-            `vxB${idx}.mp4`,
-          ]);
-          // xfade で文字だけゆっくり出現
-          await ffmpeg.exec([
-            "-i", `vxA${idx}.mp4`,
-            "-i", `vxB${idx}.mp4`,
-            "-filter_complex", `[0:v][1:v]xfade=transition=fade:duration=${vXF}:offset=${vHOLD}[v];[0:a][1:a]acrossfade=d=${vXF}[a]`,
-            "-map", "[v]", "-map", "[a]",
             "-c:v", "libx264", "-c:a", "aac", "-ar", "48000", "-ac", "2",
             outName,
           ]);
@@ -899,7 +876,19 @@ export async function makeMixedMovieWithDucking(
         if (overlayPng) {
           const txtName = `mdtxt${idx}.png`;
           await ffmpeg.writeFile(txtName, overlayPng);
-          await makeCaptionXfadeSeg(ffmpeg, inName, txtName, outName, secondsPerImage, idx);
+          await ffmpeg.exec([
+            "-loop", "1", "-i", inName,
+            "-loop", "1", "-i", txtName,
+            "-f", "lavfi", "-i", "anullsrc=channel_layout=stereo:sample_rate=48000",
+            "-t", String(secondsPerImage),
+            "-r", "30",
+            "-filter_complex", `[0:v]${baseVf}[bg];[1:v]format=rgba,fade=t=in:st=0.8:d=1.2:alpha=1,fade=t=out:st=${Math.max(0.6, secondsPerImage - 0.5)}:d=0.5:alpha=1[txt];[bg][txt]overlay=0:0:format=auto,format=yuv420p[v]`,
+            "-map", "[v]", "-map", "2:a:0",
+            "-c:v", "libx264",
+            "-c:a", "aac", "-ar", "48000", "-ac", "2",
+            "-shortest",
+            outName,
+          ]);
         } else {
           await ffmpeg.exec([
             "-loop", "1",
