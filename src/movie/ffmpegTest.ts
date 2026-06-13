@@ -815,9 +815,12 @@ export async function makeMixedMovieWithDucking(
   // 全体進捗の正規化:exec1回ごとに 0→1 が来るので、全ステップ数で割って一方向に進める
   const totalSteps = items.length + (musicFile ? 2 : 1);
   let doneSteps = 0;
+  let lastShown = 0;
   const report = (execProgress: number) => {
     const overall = (doneSteps + Math.min(1, Math.max(0, execProgress))) / totalSteps;
-    onProgress?.(Math.min(1, overall));
+    const shown = Math.max(lastShown, Math.min(1, overall));
+    lastShown = shown;
+    onProgress?.(shown);
   };
 
   const ffmpeg = await loadFFmpeg(report);
@@ -829,8 +832,21 @@ export async function makeMixedMovieWithDucking(
     const outName = `mdseg${idx}.mp4`;
     try {
       if (item.isVideo) {
+        const rawName = `mdvraw${idx}.mp4`;
         const inName = `mdvin${idx}.mp4`;
-        await ffmpeg.writeFile(inName, await fetchFile(item.blob));
+        await ffmpeg.writeFile(rawName, await fetchFile(item.blob));
+        // 原寸動画を先に720p・指定秒数へ縮小(メモリ削減)。文字なしの軽い中間を作る
+        await ffmpeg.exec([
+          "-i", rawName,
+          "-t", String(secondsPerImage),
+          "-r", "30",
+          "-vf", "scale=1280:720:force_original_aspect_ratio=decrease,pad=1280:720:(ow-iw)/2:(oh-ih)/2:color=black,format=yuv420p",
+          "-c:v", "libx264", "-preset", "veryfast",
+          "-c:a", "aac", "-ar", "48000", "-ac", "2",
+          inName,
+        ]);
+        // 原寸は即解放
+        try { await ffmpeg.deleteFile(rawName); } catch {}
         const stampV = formatStamp(item.takenAt, timezone);
         const overlayPngV = await makeTextOverlayPNG(stampV, item.caption, item.spot);
         const vBase = "scale=1280:720:force_original_aspect_ratio=decrease,pad=1280:720:(ow-iw)/2:(oh-ih)/2:color=black,format=yuv420p,fade=t=in:st=0:d=0.5";
