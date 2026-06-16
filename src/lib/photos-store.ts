@@ -2,6 +2,55 @@ import { create } from 'zustand';
 import { db } from './db';
 import type { Photo } from './types';
 
+async function makeVideoThumb(file: File): Promise<Blob | undefined> {
+  return new Promise((resolve) => {
+    const tag = "[thumb] " + file.name;
+    try {
+      const v = document.createElement("video");
+      v.muted = true;
+      (v as HTMLVideoElement & { playsInline: boolean }).playsInline = true;
+      v.setAttribute("playsinline", "");
+      v.setAttribute("muted", "");
+      v.preload = "auto";
+      const url = URL.createObjectURL(file);
+      v.src = url;
+      let done = false;
+      let seekTried = false;
+      const finish = (b?: Blob) => {
+        if (done) return;
+        done = true;
+        URL.revokeObjectURL(url);
+        resolve(b);
+      };
+      const trySeek = () => {
+        if (seekTried) return;
+        seekTried = true;
+        const t = isFinite(v.duration) && v.duration > 0.3 ? 0.1 : 0;
+      };
+      const capture = () => {
+        try {
+          const c = document.createElement("canvas");
+          c.width = v.videoWidth || 320;
+          c.height = v.videoHeight || 320;
+          const ctx = c.getContext("2d");
+          if (ctx) {
+            ctx.drawImage(v, 0, 0, c.width, c.height);
+            c.toBlob((b) => finish(b || undefined), "image/jpeg", 0.7);
+            return;
+          }
+        finish(undefined);
+      };
+      v.addEventListener("loadedmetadata", () => {
+        // iOS はデコーダを起こさないと seek が効かないことがあるので一瞬再生する
+        v.play().then(() => { v.pause(); trySeek(); }).catch(() => { trySeek(); });
+      });
+      v.load();
+    } catch (e) {
+      resolve(undefined);
+    }
+  });
+}
+
 interface PhotosState {
   photos: Photo[];
   loading: boolean;
@@ -146,6 +195,22 @@ export const usePhotosStore = create<PhotosState>((set, get) => ({
       // takenAt 昇順(古い→新しい)
       photos.sort((a, b) => a.takenAt.localeCompare(b.takenAt));
       set({ photos, loading: false });
+      // 既存の動画でサムネ未生成のものを、裏で順に補完する
+      void (async () => {
+        for (const ph of photos) {
+          if (!ph.blob.type.startsWith("video/")) continue;
+          if (ph.thumbBlob) continue;
+          try {
+            const file = new File([ph.blob], ph.filename, { type: ph.blob.type });
+            const thumbBlob = await makeVideoThumb(file);
+            if (!thumbBlob) continue;
+            await db.photos.update(ph.id, { thumbBlob });
+            set((st) => ({
+              photos: st.photos.map((x) => (x.id === ph.id ? { ...x, thumbBlob } : x)),
+            }));
+          } catch {}
+        }
+      })();
     } catch (error) {
       console.error('Failed to load photos:', error);
       set({ loading: false });
@@ -157,11 +222,13 @@ export const usePhotosStore = create<PhotosState>((set, get) => ({
     const newPhotos: Photo[] = [];
     for (const file of files) {
       const takenAt = await extractTakenAt(file);
+      const thumbBlob = file.type.startsWith("video/") ? await makeVideoThumb(file) : undefined;
       const photo: Photo = {
         id: crypto.randomUUID(),
         tripId,
         filename: file.name,
         blob: file,
+        thumbBlob,
         takenAt,
         isFavorite: false,
         createdAt: now,

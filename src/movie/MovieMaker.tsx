@@ -331,7 +331,7 @@ export default function MovieMaker({
               return (
                 <div key={i} style={{ display: "flex", gap: 10, alignItems: "center", marginTop: 12 }}>
                   {isVid ? (
-                    <video src={URL.createObjectURL(f) + "#t=0.1"} muted playsInline preload="metadata" onLoadedMetadata={(e) => { try { (e.currentTarget as HTMLVideoElement).currentTime = 0.1; } catch {} }} style={{ width: 52, height: 52, objectFit: "cover", flexShrink: 0, borderRadius: 2, background: "rgba(58,47,31,0.12)" }} />
+                    <VideoThumb src={URL.createObjectURL(f)} style={{ width: 52, height: 52, objectFit: "cover", flexShrink: 0, borderRadius: 2 }} />
                   ) : (
                     <img src={URL.createObjectURL(f)} alt="" style={{ width: 52, height: 52, objectFit: "cover", flexShrink: 0, borderRadius: 2 }} />
                   )}
@@ -417,6 +417,84 @@ export default function MovieMaker({
 }
 
 /* ───── サムネイル(アプリ写真選択用) ───── */
+function VideoThumb({ src: _src, style, thumbBlob }: { src: string; style: CSSProperties; thumbBlob?: Blob }) {
+  const [img, setImg] = useState<string | null>(null);
+  useEffect(() => {
+    if (thumbBlob) {
+      const u = URL.createObjectURL(thumbBlob);
+      setImg(u);
+      return () => URL.revokeObjectURL(u);
+    }
+    setImg(null);
+  }, [thumbBlob]);
+  if (img) return <img src={img} alt="" style={style} />;
+  // サムネ未保存の動画はプレースホルダ(背景+再生マーク)を表示
+  return (
+    <div style={{ ...style, background: "rgba(58,47,31,0.12)", display: "flex", alignItems: "center", justifyContent: "center", position: "relative" }}>
+      <div style={{ width: 0, height: 0, borderTop: "7px solid transparent", borderBottom: "7px solid transparent", borderLeft: "11px solid rgba(255,255,255,0.85)", marginLeft: 3 }} />
+    </div>
+  );
+}: { src: string; style: CSSProperties; thumbBlob?: Blob }) {
+  const [img, setImg] = useState<string | null>(null);
+  useEffect(() => {
+    if (thumbBlob) {
+      const u = URL.createObjectURL(thumbBlob);
+      setImg(u);
+      return () => URL.revokeObjectURL(u);
+    }
+    let cancelled = false;
+    let seekTried = false;
+    let timer = 0;
+    const v = document.createElement("video");
+    v.muted = true;
+    v.playsInline = true;
+    v.setAttribute("playsinline", "");
+    v.setAttribute("muted", "");
+    v.preload = "auto";
+    v.src = src;
+    const cleanup = () => { if (timer) clearTimeout(timer); v.removeAttribute("src"); v.load(); };
+    const trySeek = () => {
+      if (seekTried) return;
+      seekTried = true;
+      const t = isFinite(v.duration) && v.duration > 0.3 ? 0.1 : 0;
+      try { v.currentTime = t; } catch {}
+    };
+    const onMeta = () => {
+      // iOS はデコーダを起こさないと seek が効かないことがあるので一瞬再生する
+      v.play().then(() => { v.pause(); trySeek(); }).catch(() => { trySeek(); });
+    };
+    const onLoaded = () => { trySeek(); };
+    const onSeeked = () => {
+      try {
+        const c = document.createElement("canvas");
+        c.width = v.videoWidth || 320;
+        c.height = v.videoHeight || 320;
+        const ctx = c.getContext("2d");
+        if (ctx) {
+          ctx.drawImage(v, 0, 0, c.width, c.height);
+          const data = c.toDataURL("image/jpeg", 0.7);
+          if (!cancelled) setImg(data);
+        }
+      } catch {}
+      cleanup();
+    };
+    v.addEventListener("loadedmetadata", onMeta);
+    v.addEventListener("loadeddata", onLoaded);
+    v.addEventListener("seeked", onSeeked);
+    timer = window.setTimeout(() => { cleanup(); }, 8000);
+    v.load();
+    return () => {
+      cancelled = true;
+      v.removeEventListener("loadedmetadata", onMeta);
+      v.removeEventListener("loadeddata", onLoaded);
+      v.removeEventListener("seeked", onSeeked);
+      cleanup();
+    };
+  }, [src, thumbBlob]);
+  if (img) return <img src={img} alt="" style={style} />;
+  return <div style={{ ...style, background: "rgba(58,47,31,0.12)" }} />;
+}
+
 function PhotoThumb({
   photo, selected, order, onClick,
 }: {
@@ -432,7 +510,7 @@ function PhotoThumb({
   return (
     <button onClick={onClick} style={{ ...S.thumb, ...(selected ? S.thumbSel : {}) }}>
       {url && (isVideo ? (
-        <video src={`${url}#t=0.1`} style={S.thumbImg} muted playsInline preload="metadata" onLoadedMetadata={(e) => { try { (e.currentTarget as HTMLVideoElement).currentTime = 0.1; } catch {} }} />
+        <VideoThumb src={url} thumbBlob={photo.thumbBlob} style={S.thumbImg} />
       ) : (
         <img src={url} alt={photo.filename} style={S.thumbImg} />
       ))}

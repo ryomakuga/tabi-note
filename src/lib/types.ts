@@ -92,6 +92,7 @@ export interface Photo {
   tripId: string;
   filename: string;
   blob: Blob;
+  thumbBlob?: Blob;
   takenAt: string;
   isFavorite: boolean;
   createdAt: string;
