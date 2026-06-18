@@ -8,18 +8,23 @@ async function makeVideoThumb(file: File): Promise<Blob | undefined> {
       const v = document.createElement("video");
       v.muted = true;
       v.playsInline = true;
+      v.setAttribute("muted", "");
+      v.setAttribute("playsinline", "");
       v.preload = "auto";
       const url = URL.createObjectURL(file);
       v.src = url;
       let done = false;
+      let captured = false;
       const finish = (b?: Blob) => {
         if (done) return;
         done = true;
+        try { v.pause(); } catch {}
         URL.revokeObjectURL(url);
         resolve(b);
       };
-      v.addEventListener("loadeddata", () => { try { v.currentTime = 0.1; } catch {} });
-      v.addEventListener("seeked", () => {
+      const capture = () => {
+        if (captured) return;
+        captured = true;
         try {
           const c = document.createElement("canvas");
           c.width = v.videoWidth || 320;
@@ -32,9 +37,24 @@ async function makeVideoThumb(file: File): Promise<Blob | undefined> {
           }
         } catch {}
         finish(undefined);
+      };
+      const seekToFrame = () => {
+        try {
+          const t = isFinite(v.duration) && v.duration > 0.3 ? 0.1 : 0;
+          v.currentTime = t;
+        } catch { capture(); }
+      };
+      // iOS はデコーダを起こさないと seek/描画が効かないので一瞬再生する
+      v.addEventListener("loadedmetadata", () => {
+        v.play().then(() => {
+          // 再生でフレームがデコードされたら止めて目的位置へ
+          setTimeout(() => { try { v.pause(); } catch {} seekToFrame(); }, 120);
+        }).catch(() => { seekToFrame(); });
       });
+      v.addEventListener("seeked", () => { capture(); });
       v.addEventListener("error", () => finish(undefined));
-      setTimeout(() => finish(undefined), 5000);
+      setTimeout(() => { if (!done) capture(); }, 4000);
+      setTimeout(() => finish(undefined), 6000);
       v.load();
     } catch {
       resolve(undefined);
