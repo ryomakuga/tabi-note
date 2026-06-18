@@ -160,7 +160,7 @@ export function FlightFormModal({ tripId, flight, onClose }: FlightFormModalProp
                 type="text"
                 value={flightNo}
                 onChange={(e) => setFlightNo(e.target.value)}
-                placeholder="VN337"
+                placeholder="例: VN123"
                 className="w-full px-3 py-2 bg-bg-alt border border-text-sub/20 rounded-sm font-serif-ja text-text placeholder:text-text-sub/40 focus:outline-none focus:border-accent transition-colors"
                 disabled={isSubmitting}
               />
@@ -277,7 +277,7 @@ export function FlightFormModal({ tripId, flight, onClose }: FlightFormModalProp
               type="text"
               value={bookingNo}
               onChange={(e) => setBookingNo(e.target.value)}
-              placeholder="N25004536"
+              placeholder="例: A1234567"
               className="w-full px-3 py-2 bg-bg-alt border border-text-sub/20 rounded-sm font-serif-ja text-text placeholder:text-text-sub/40 focus:outline-none focus:border-accent transition-colors"
               disabled={isSubmitting}
             />
