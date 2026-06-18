@@ -54,7 +54,7 @@ export function SettingsMenu({ onClose }: Props) {
   /* ───── インポート実行 ───── */
   const handleImportConfirm = async () => {
     if (!confirmImport) return;
-    setStatus({ kind: 'busy', message: '復元中…(既存データは上書きされます)' });
+    setStatus({ kind: 'busy', message: '読み込み中…' });
     try {
       const text = await confirmImport.text();
       const result: ImportResult = await importDataFromJson(text);
@@ -129,7 +129,7 @@ export function SettingsMenu({ onClose }: Props) {
           <MenuItem
             label="IMPORT"
             labelJa="バックアップを読み込む"
-            description="JSON ファイルから復元します。既存のデータは上書きされます。"
+            description="JSON ファイルから旅を読み込みます。既存の旅は残り、同じ旅は最新の内容に更新されます。"
             onClick={() => fileInputRef.current?.click()}
             disabled={isBusy}
           />
@@ -187,12 +187,12 @@ export function SettingsMenu({ onClose }: Props) {
               — Confirm
             </p>
             <h3 className="font-serif text-[22px] text-text mb-3 tracking-tight">
-              既存データを上書きします
+              バックアップを読み込みます
             </h3>
             <p className="font-serif-ja text-[12px] text-text-sub leading-relaxed mb-6">
               「{confirmImport.name}」を読み込みます。
               <br />
-              現在の旅行・写真などすべてのデータが上書きされます。続行しますか?
+              既存の旅は消えません。同じ旅があれば最新の内容に更新し、新しい旅は追加します。続行しますか?
             </p>
             <div className="flex gap-3">
               <button
