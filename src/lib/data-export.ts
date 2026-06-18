@@ -157,20 +157,12 @@ export async function importDataFromJson(jsonString: string): Promise<ImportResu
   const data = parsed;
 
   await db.transaction('rw', [db.trips, db.flights, db.hotels, db.spots, db.meals, db.photos], async () => {
-    await Promise.all([
-      db.trips.clear(),
-      db.flights.clear(),
-      db.hotels.clear(),
-      db.spots.clear(),
-      db.meals.clear(),
-      db.photos.clear(),
-    ]);
 
-    await db.trips.bulkAdd(data.trips);
-    await db.flights.bulkAdd(data.flights);
-    await db.hotels.bulkAdd(data.hotels);
-    await db.spots.bulkAdd(data.spots);
-    await db.meals.bulkAdd(data.meals);
+    await db.trips.bulkPut(data.trips);
+    await db.flights.bulkPut(data.flights);
+    await db.hotels.bulkPut(data.hotels);
+    await db.spots.bulkPut(data.spots);
+    await db.meals.bulkPut(data.meals);
 
     const photosRestored: Photo[] = data.photos.map((p) => ({
       id: p.id,
@@ -182,7 +174,7 @@ export async function importDataFromJson(jsonString: string): Promise<ImportResu
       isFavorite: p.isFavorite,
       createdAt: p.createdAt,
     }));
-    await db.photos.bulkAdd(photosRestored);
+    await db.photos.bulkPut(photosRestored);
   });
 
   return {
