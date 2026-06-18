@@ -33,7 +33,6 @@ export function TripsHome() {
 
   const upcomingTrips = getUpcomingTrips();
   const pastTrips = getPastTrips();
-  const featuredTrip: Trip | undefined = upcomingTrips[0];
 
   if (trips.length === 0) {
     return (
@@ -71,10 +70,17 @@ export function TripsHome() {
           <p className="text-sm text-text-sub" style={{ fontFamily: '"Cormorant Garamond", serif', fontStyle: 'italic' }}>a quiet collection of journeys</p>
         </div>
 
-        {featuredTrip && (
+        {upcomingTrips.length > 0 && (
           <>
             <SectionLabel text="— Upcoming" />
-            <FeaturedTripCard trip={featuredTrip} daysToGo={getDaysUntilStart(featuredTrip)} onClick={() => openTrip(featuredTrip.id)} />
+            <FeaturedTripCard trip={upcomingTrips[0]} daysToGo={getDaysUntilStart(upcomingTrips[0])} onClick={() => openTrip(upcomingTrips[0].id)} />
+            {upcomingTrips.length > 1 && (
+              <div className="mb-6">
+                {upcomingTrips.slice(1).map((trip) => (
+                  <PastTripCard key={trip.id} trip={trip} index={getDaysUntilStart(trip)} onClick={() => openTrip(trip.id)} />
+                ))}
+              </div>
+            )}
           </>
         )}
 
