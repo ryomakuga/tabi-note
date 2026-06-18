@@ -4,30 +4,22 @@ import type { Photo } from './types';
 
 async function makeVideoThumb(file: File): Promise<Blob | undefined> {
   return new Promise((resolve) => {
-    const tag = "[thumb] " + file.name;
     try {
       const v = document.createElement("video");
       v.muted = true;
-      (v as HTMLVideoElement & { playsInline: boolean }).playsInline = true;
-      v.setAttribute("playsinline", "");
-      v.setAttribute("muted", "");
+      v.playsInline = true;
       v.preload = "auto";
       const url = URL.createObjectURL(file);
       v.src = url;
       let done = false;
-      let seekTried = false;
       const finish = (b?: Blob) => {
         if (done) return;
         done = true;
         URL.revokeObjectURL(url);
         resolve(b);
       };
-      const trySeek = () => {
-        if (seekTried) return;
-        seekTried = true;
-        const t = isFinite(v.duration) && v.duration > 0.3 ? 0.1 : 0;
-      };
-      const capture = () => {
+      v.addEventListener("loadeddata", () => { try { v.currentTime = 0.1; } catch {} });
+      v.addEventListener("seeked", () => {
         try {
           const c = document.createElement("canvas");
           c.width = v.videoWidth || 320;
@@ -38,14 +30,13 @@ async function makeVideoThumb(file: File): Promise<Blob | undefined> {
             c.toBlob((b) => finish(b || undefined), "image/jpeg", 0.7);
             return;
           }
+        } catch {}
         finish(undefined);
-      };
-      v.addEventListener("loadedmetadata", () => {
-        // iOS はデコーダを起こさないと seek が効かないことがあるので一瞬再生する
-        v.play().then(() => { v.pause(); trySeek(); }).catch(() => { trySeek(); });
       });
+      v.addEventListener("error", () => finish(undefined));
+      setTimeout(() => finish(undefined), 5000);
       v.load();
-    } catch (e) {
+    } catch {
       resolve(undefined);
     }
   });

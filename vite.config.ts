@@ -18,6 +18,7 @@ export default defineConfig({
     basicSsl(),
     VitePWA({
       registerType: 'autoUpdate',
+      selfDestroying: true,
       includeAssets: ['tabi-note-favicon.svg', 'tabi-note-icon.svg'],
       manifest: {
         name: 'Tabi Note — タビノート',

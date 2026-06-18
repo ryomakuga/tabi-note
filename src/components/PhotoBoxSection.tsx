@@ -197,6 +197,13 @@ function PhotoCell({
 }) {
   const [url, setUrl] = useState<string | null>(null);
   const isVideo = photo.blob.type.startsWith('video/');
+  const [thumbUrl, setThumbUrl] = useState<string | null>(null);
+  useEffect(() => {
+    if (!photo.thumbBlob) { setThumbUrl(null); return; }
+    const tu = URL.createObjectURL(photo.thumbBlob);
+    setThumbUrl(tu);
+    return () => URL.revokeObjectURL(tu);
+  }, [photo.thumbBlob]);
   useEffect(() => {
     const u = URL.createObjectURL(photo.blob);
     setUrl(u);
@@ -208,7 +215,11 @@ function PhotoCell({
       className={`relative overflow-hidden bg-bg-alt ${className}`}
     >
       {url && (isVideo ? (
-        <video src={`${url}#t=0.1`} className="w-full h-full object-cover" muted playsInline preload="metadata" />
+        thumbUrl ? (
+          <img src={thumbUrl} alt={photo.filename} className="w-full h-full object-cover" loading="lazy" />
+        ) : (
+          <video src={`${url}#t=0.1`} className="w-full h-full object-cover" muted playsInline preload="metadata" />
+        )
       ) : (
         <img src={url} alt={photo.filename} className="w-full h-full object-cover" loading="lazy" />
       ))}

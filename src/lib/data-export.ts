@@ -34,6 +34,7 @@ interface PhotoExport {
   takenAt: string;
   isFavorite: boolean;
   createdAt: string;
+  thumbBlobBase64?: string;
 }
 
 /* ───────── ヘルパー:Blob ↔ Base64 ───────── */
@@ -82,6 +83,7 @@ export async function exportAllData(): Promise<ExportData> {
       takenAt: p.takenAt,
       isFavorite: p.isFavorite,
       createdAt: p.createdAt,
+      thumbBlobBase64: p.thumbBlob ? await blobToBase64(p.thumbBlob) : undefined,
     }))
   );
 
@@ -175,6 +177,7 @@ export async function importDataFromJson(jsonString: string): Promise<ImportResu
       tripId: p.tripId,
       filename: p.filename,
       blob: base64ToBlob(p.blobBase64, p.blobType),
+      thumbBlob: p.thumbBlobBase64 ? base64ToBlob(p.thumbBlobBase64, 'image/jpeg') : undefined,
       takenAt: p.takenAt,
       isFavorite: p.isFavorite,
       createdAt: p.createdAt,

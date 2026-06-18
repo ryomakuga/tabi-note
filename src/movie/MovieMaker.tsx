@@ -428,7 +428,7 @@ function VideoThumb({ src, style, thumbBlob }: { src: string; style: CSSProperti
   // 保存済みサムネがあればそれを表示。無ければ video 自身に表紙(先頭フレーム)を出させる。iOS の HEVC でもこれなら表示される。
   if (img) return <img src={img} alt="" style={style} />;
   return (
-    <video src={src} muted playsInline preload="metadata" style={{ ...style, objectFit: "cover" }} />
+    <video src={src} muted playsInline preload="metadata" style={{ ...style, objectFit: "cover", border: "3px solid red" }} />
   );
 }
 
