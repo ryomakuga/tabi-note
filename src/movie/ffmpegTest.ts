@@ -62,7 +62,7 @@ export async function testMakeVideo(): Promise<string> {
   console.log("STEP 8: exec完了 ret=", ret);
   const data = await ffmpeg.readFile("out.mp4");
   console.log("STEP 9: readFile完了", (data as Uint8Array).length, "bytes");
-  const blob = new Blob([data], { type: "video/mp4" });
+  const blob = new Blob([data as BlobPart], { type: "video/mp4" });
   return URL.createObjectURL(blob);
 }
 
@@ -125,7 +125,7 @@ export async function makeSlideshowFromBlobs(
   ]);
 
   const data = await ffmpeg.readFile("out.mp4");
-  const blob = new Blob([data], { type: "video/mp4" });
+  const blob = new Blob([data as BlobPart], { type: "video/mp4" });
   return URL.createObjectURL(blob);
 }
 
@@ -198,7 +198,7 @@ export async function makeSlideshowWithMusic(
   ]);
 
   const data = await ffmpeg.readFile("out.mp4");
-  const blob = new Blob([data], { type: "video/mp4" });
+  const blob = new Blob([data as BlobPart], { type: "video/mp4" });
   return URL.createObjectURL(blob);
 }
 
@@ -266,7 +266,7 @@ export async function testConcatPhotosAndVideos(
   ]);
 
   const data = await ffmpeg.readFile("concat_out.mp4");
-  const blob = new Blob([data], { type: "video/mp4" });
+  const blob = new Blob([data as BlobPart], { type: "video/mp4" });
   console.log("連結完了:", blob.size, "bytes");
   return URL.createObjectURL(blob);
 }
@@ -354,7 +354,7 @@ export async function testConcatWithMusic(
   ]);
 
   const data = await ffmpeg.readFile("final_out.mp4");
-  const blob = new Blob([data], { type: "video/mp4" });
+  const blob = new Blob([data as BlobPart], { type: "video/mp4" });
   console.log("BGM付き連結完了:", blob.size, "bytes");
   return URL.createObjectURL(blob);
 }
@@ -577,7 +577,7 @@ export async function makeMixedMovie(
   // BGM が無ければ無音のまま返す
   if (!musicFile) {
     const data = await ffmpeg.readFile("mixed_video.mp4");
-    const blob = new Blob([data], { type: "video/mp4" });
+    const blob = new Blob([data as BlobPart], { type: "video/mp4" });
     return { url: URL.createObjectURL(blob), skipped };
   }
 
@@ -601,7 +601,7 @@ export async function makeMixedMovie(
     "mixed_final.mp4",
   ]);
   const data = await ffmpeg.readFile("mixed_final.mp4");
-  const blob = new Blob([data], { type: "video/mp4" });
+  const blob = new Blob([data as BlobPart], { type: "video/mp4" });
   console.log("合成完了:", blob.size, "bytes / スキップ:", skipped);
   return { url: URL.createObjectURL(blob), skipped };
 }
@@ -705,7 +705,7 @@ export async function testDuckingMix(
   ]);
 
   const data = await ffmpeg.readFile("dducked.mp4");
-  const blob = new Blob([data], { type: "video/mp4" });
+  const blob = new Blob([data as BlobPart], { type: "video/mp4" });
   console.log("ダッキング合成完了:", blob.size, "bytes / スキップ:", skipped);
   return { url: URL.createObjectURL(blob), skipped };
 }
@@ -741,7 +741,7 @@ export async function testDuckSingle(
     "ssingle.mp4",
   ]);
   const data = await ffmpeg.readFile("ssingle.mp4");
-  const blob = new Blob([data], { type: "video/mp4" });
+  const blob = new Blob([data as BlobPart], { type: "video/mp4" });
   console.log("単体ダッキング完了:", blob.size, "bytes");
   return URL.createObjectURL(blob);
 }
@@ -750,7 +750,7 @@ export async function testDuckSingle(
 // 写真=無音, 動画=音声付き で正規化 → 連結 → 連結音声(動画の声)1.5倍 と BGM(bgmVolume倍)を normalize=0 で混ぜる。
 // 「文字だけがふわっと浮かび上がる」1カットを作る。
 // 同じ写真の【文字なし】と【文字あり】を作り、xfadeで繋ぐ。写真は同じなので文字だけが出現して見える。
-async function makeCaptionXfadeSeg(
+export async function _makeCaptionXfadeSeg(
   ffmpeg: any,
   inName: string,          // 写真ファイル名（書き込み済み）
   txtName: string,         // キャプションPNGファイル名（書き込み済み）
@@ -886,7 +886,6 @@ export async function makeMixedMovieWithDucking(
         // 日付スタンプのテキストPNGを用意(takenAt があれば)
         const stamp = formatStamp(item.takenAt, timezone);
         const overlayPng = await makeTextOverlayPNG(stamp, item.caption, item.spot);
-        const zpFrames = Math.max(1, Math.round(secondsPerImage * 30));
         const baseVf = `scale=1280:720:force_original_aspect_ratio=decrease,pad=1280:720:(ow-iw)/2:(oh-ih)/2:color=black,format=yuv420p,fade=t=in:st=0:d=0.5,fade=t=out:st=${Math.max(0.6, secondsPerImage - 0.5)}:d=0.5`;
 
         if (overlayPng) {
@@ -950,7 +949,7 @@ export async function makeMixedMovieWithDucking(
   // BGMが無ければ、連結した(動画の声入り)動画をそのまま返す
   if (!musicFile) {
     const data = await ffmpeg.readFile("mdmerged.mp4");
-    const blob = new Blob([data], { type: "video/mp4" });
+    const blob = new Blob([data as BlobPart], { type: "video/mp4" });
     onProgress?.(1);
     return { url: URL.createObjectURL(blob), skipped };
   }
@@ -980,7 +979,7 @@ export async function makeMixedMovieWithDucking(
   doneSteps++;
 
   const data = await ffmpeg.readFile("mdfinal.mp4");
-  const blob = new Blob([data], { type: "video/mp4" });
+  const blob = new Blob([data as BlobPart], { type: "video/mp4" });
   onProgress?.(1);
   console.log("ダッキング本番合成完了:", blob.size, "bytes / スキップ:", skipped);
   return { url: URL.createObjectURL(blob), skipped };

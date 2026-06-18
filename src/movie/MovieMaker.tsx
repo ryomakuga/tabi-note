@@ -1,9 +1,6 @@
 // src/movie/MovieMaker.tsx
 import { useState, useRef, useEffect, type ChangeEvent, type CSSProperties } from "react";
 import {
-  makeSlideshowWithMusic,
-  makeSlideshowFromBlobs,
-  makeMixedMovie,
   makeMixedMovieWithDucking,
   makeCoverPNG,
   downloadVideo,

@@ -5,6 +5,7 @@ import { VitePWA } from 'vite-plugin-pwa'
 
 // https://vite.dev/config/
 export default defineConfig({
+  base: '/tabi-note/',
   server: {
     host: true,
     headers: {
@@ -28,8 +29,8 @@ export default defineConfig({
         background_color: '#ECE5D8',
         display: 'standalone',
         orientation: 'portrait',
-        scope: '/',
-        start_url: '/',
+        scope: '/tabi-note/',
+        start_url: '/tabi-note/',
         lang: 'ja',
         categories: ['travel', 'lifestyle', 'productivity'],
         icons: [
