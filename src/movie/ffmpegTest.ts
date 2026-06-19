@@ -56,7 +56,7 @@ export async function testMakeVideo(): Promise<string> {
     "-i", "img%d.png",
     "-c:v", "libx264",
     "-pix_fmt", "yuv420p",
-    "-vf", "fps=24",
+    "-vf", "fps=20",
     "out.mp4",
   ]);
   console.log("STEP 8: exec完了 ret=", ret);
@@ -120,7 +120,7 @@ export async function makeSlideshowFromBlobs(
     "-vsync", "vfr",
     "-c:v", "libx264",
     "-pix_fmt", "yuv420p",
-    "-vf", "fps=24,scale=640:360:force_original_aspect_ratio=decrease,pad=640:360:(ow-iw)/2:(oh-ih)/2:color=black",
+    "-vf", "fps=20,scale=640:360:force_original_aspect_ratio=decrease,pad=640:360:(ow-iw)/2:(oh-ih)/2:color=black",
     "out.mp4",
   ]);
 
@@ -192,7 +192,7 @@ export async function makeSlideshowWithMusic(
     "-pix_fmt", "yuv420p",
     "-c:a", "aac",
     "-b:a", "192k",
-    "-vf", "fps=24,scale=640:360:force_original_aspect_ratio=decrease,pad=640:360:(ow-iw)/2:(oh-ih)/2:color=black",
+    "-vf", "fps=20,scale=640:360:force_original_aspect_ratio=decrease,pad=640:360:(ow-iw)/2:(oh-ih)/2:color=black",
     "-shortest",
     "out.mp4",
   ]);
@@ -762,7 +762,7 @@ export async function _makeCaptionXfadeSeg(
   const XF = 2.4;                                              // 文字が浮かび上がる時間（長め＝ゆっくり）
   const HOLD = Math.max(0.4, Math.min(0.9, secondsPerImage * 0.18)); // 文字が出る前の間（短め＝早く出る）
   const padVf = "scale=640:360:force_original_aspect_ratio=decrease,pad=640:360:(ow-iw)/2:(oh-ih)/2:color=black";
-  const zoomVf = `zoompan=z='min(1.08,1+0.08*on/${zpFrames})':x='iw/2-(iw/zoom/2)':y='ih/2-(ih/zoom/2)':d=${zpFrames}:s=640x360:fps=24,format=yuv420p`;
+  const zoomVf = `zoompan=z='min(1.08,1+0.08*on/${zpFrames})':x='iw/2-(iw/zoom/2)':y='ih/2-(ih/zoom/2)':d=${zpFrames}:s=640x360:fps=20,format=yuv420p`;
   const aDur = HOLD + XF;                                      // 文字なしパートの長さ
   const bDur = Math.max(XF + 0.3, secondsPerImage - HOLD + XF); // 文字ありパートの長さ
   // segA: 文字なし（頭に黒フェードイン）
