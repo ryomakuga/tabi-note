@@ -120,7 +120,7 @@ export async function makeSlideshowFromBlobs(
     "-vsync", "vfr",
     "-c:v", "libx264",
     "-pix_fmt", "yuv420p",
-    "-vf", "fps=24,scale=854:480:force_original_aspect_ratio=decrease,pad=854:480:(ow-iw)/2:(oh-ih)/2:color=black",
+    "-vf", "fps=24,scale=640:360:force_original_aspect_ratio=decrease,pad=640:360:(ow-iw)/2:(oh-ih)/2:color=black",
     "out.mp4",
   ]);
 
@@ -192,7 +192,7 @@ export async function makeSlideshowWithMusic(
     "-pix_fmt", "yuv420p",
     "-c:a", "aac",
     "-b:a", "192k",
-    "-vf", "fps=24,scale=854:480:force_original_aspect_ratio=decrease,pad=854:480:(ow-iw)/2:(oh-ih)/2:color=black",
+    "-vf", "fps=24,scale=640:360:force_original_aspect_ratio=decrease,pad=640:360:(ow-iw)/2:(oh-ih)/2:color=black",
     "-shortest",
     "out.mp4",
   ]);
@@ -203,7 +203,7 @@ export async function makeSlideshowWithMusic(
 }
 
 // ───────── 実験:写真+動画クリップを音声なしで連結できるか検証(段階6-1) ─────────
-// 各クリップを 854x480 / 30fps / libx264 に正規化してから concat する。
+// 各クリップを 640x360 / 30fps / libx264 に正規化してから concat する。
 // images: 写真Blob[]、videos: 動画Blob[] を、写真→動画 の順に1本へ繋ぐ最小テスト。
 export async function testConcatPhotosAndVideos(
   images: Blob[],
@@ -225,7 +225,7 @@ export async function testConcatPhotosAndVideos(
       "-i", inName,
       "-t", String(secondsPerImage),
       "-r", "30",
-      "-vf", "scale=854:480:force_original_aspect_ratio=decrease,pad=854:480:(ow-iw)/2:(oh-ih)/2:color=black,format=yuv420p",
+      "-vf", "scale=640:360:force_original_aspect_ratio=decrease,pad=640:360:(ow-iw)/2:(oh-ih)/2:color=black,format=yuv420p",
       "-c:v", "libx264",
       "-an",
       outName,
@@ -243,7 +243,7 @@ export async function testConcatPhotosAndVideos(
     await ffmpeg.exec([
       "-i", inName,
       "-r", "30",
-      "-vf", "scale=854:480:force_original_aspect_ratio=decrease,pad=854:480:(ow-iw)/2:(oh-ih)/2:color=black,format=yuv420p",
+      "-vf", "scale=640:360:force_original_aspect_ratio=decrease,pad=640:360:(ow-iw)/2:(oh-ih)/2:color=black,format=yuv420p",
       "-c:v", "libx264",
       "-an",
       outName,
@@ -293,7 +293,7 @@ export async function testConcatWithMusic(
       "-i", inName,
       "-t", String(secondsPerImage),
       "-r", "30",
-      "-vf", "scale=854:480:force_original_aspect_ratio=decrease,pad=854:480:(ow-iw)/2:(oh-ih)/2:color=black,format=yuv420p",
+      "-vf", "scale=640:360:force_original_aspect_ratio=decrease,pad=640:360:(ow-iw)/2:(oh-ih)/2:color=black,format=yuv420p",
       "-c:v", "libx264",
       "-an",
       outName,
@@ -310,7 +310,7 @@ export async function testConcatWithMusic(
     await ffmpeg.exec([
       "-i", inName,
       "-r", "30",
-      "-vf", "scale=854:480:force_original_aspect_ratio=decrease,pad=854:480:(ow-iw)/2:(oh-ih)/2:color=black,format=yuv420p",
+      "-vf", "scale=640:360:force_original_aspect_ratio=decrease,pad=640:360:(ow-iw)/2:(oh-ih)/2:color=black,format=yuv420p",
       "-c:v", "libx264",
       "-an",
       outName,
@@ -365,7 +365,7 @@ export async function testConcatWithMusic(
 export type MixedItem = { blob: Blob; isVideo: boolean; takenAt?: string; caption?: { jp?: string; en?: string } | string; spot?: string };
 
 // ───────── テキストオーバーレイPNG生成(Kinfolkトーン:明朝・白文字・薄い影) ─────────
-// 854x480 の透明キャンバスにテキストを描き、PNG(Uint8Array)で返す。
+// 640x360 の透明キャンバスにテキストを描き、PNG(Uint8Array)で返す。
 // 文字が無い(空文字)の場合は null を返す。
 async function makeTextOverlayPNG(
   text: string,
@@ -379,7 +379,7 @@ async function makeTextOverlayPNG(
   const spotName = spot?.trim() || "";
   if (!text && !jp && !en && !spotName) return null;
 
-  const W = 854, H = 480;
+  const W = 640, H = 360;
   const canvas = document.createElement("canvas");
   canvas.width = W;
   canvas.height = H;
@@ -450,10 +450,10 @@ async function makeTextOverlayPNG(
 }
 
 // ───────── 表紙カットPNG生成(Kinfolkトーン:ベージュ背景・セリフ体タイトル) ─────────
-// 854x480 のベージュ背景にタイトルを中央配置して PNG Blob で返す。
+// 640x360 のベージュ背景にタイトルを中央配置して PNG Blob で返す。
 export async function makeCoverPNG(title: string): Promise<Blob | null> {
   if (!title) return null;
-  const W = 854, H = 480;
+  const W = 640, H = 360;
   const canvas = document.createElement("canvas");
   canvas.width = W;
   canvas.height = H;
@@ -533,7 +533,7 @@ export async function makeMixedMovie(
         await ffmpeg.exec([
           "-i", inName,
           "-r", "30",
-          "-vf", "scale=854:480:force_original_aspect_ratio=decrease,pad=854:480:(ow-iw)/2:(oh-ih)/2:color=black,format=yuv420p",
+          "-vf", "scale=640:360:force_original_aspect_ratio=decrease,pad=640:360:(ow-iw)/2:(oh-ih)/2:color=black,format=yuv420p",
           "-c:v", "libx264",
           "-an",
           outName,
@@ -547,7 +547,7 @@ export async function makeMixedMovie(
           "-i", inName,
           "-t", String(secondsPerImage),
           "-r", "30",
-          "-vf", "scale=854:480:force_original_aspect_ratio=decrease,pad=854:480:(ow-iw)/2:(oh-ih)/2:color=black,format=yuv420p",
+          "-vf", "scale=640:360:force_original_aspect_ratio=decrease,pad=640:360:(ow-iw)/2:(oh-ih)/2:color=black,format=yuv420p",
           "-c:v", "libx264",
           "-an",
           outName,
@@ -635,7 +635,7 @@ export async function testDuckingMix(
           "-map", "0:v:0",
           "-map", "0:a:0?",
           "-r", "30",
-          "-vf", "scale=854:480:force_original_aspect_ratio=decrease,pad=854:480:(ow-iw)/2:(oh-ih)/2:color=black,format=yuv420p",
+          "-vf", "scale=640:360:force_original_aspect_ratio=decrease,pad=640:360:(ow-iw)/2:(oh-ih)/2:color=black,format=yuv420p",
           "-c:v", "libx264",
           "-c:a", "aac", "-ar", "48000", "-ac", "2",
           "-shortest",
@@ -652,7 +652,7 @@ export async function testDuckingMix(
           "-f", "lavfi", "-i", "anullsrc=channel_layout=stereo:sample_rate=48000",
           "-t", String(secondsPerImage),
           "-r", "30",
-          "-vf", "scale=854:480:force_original_aspect_ratio=decrease,pad=854:480:(ow-iw)/2:(oh-ih)/2:color=black,format=yuv420p",
+          "-vf", "scale=640:360:force_original_aspect_ratio=decrease,pad=640:360:(ow-iw)/2:(oh-ih)/2:color=black,format=yuv420p",
           "-c:v", "libx264",
           "-c:a", "aac", "-ar", "48000", "-ac", "2",
           "-shortest",
@@ -735,7 +735,7 @@ export async function testDuckSingle(
     "-map", "0:v",
     "-map", "[aout]",
     "-c:v", "libx264",
-    "-vf", "scale=854:480:force_original_aspect_ratio=decrease,pad=854:480:(ow-iw)/2:(oh-ih)/2:color=black,format=yuv420p",
+    "-vf", "scale=640:360:force_original_aspect_ratio=decrease,pad=640:360:(ow-iw)/2:(oh-ih)/2:color=black,format=yuv420p",
     "-c:a", "aac", "-b:a", "192k",
     "-shortest",
     "ssingle.mp4",
@@ -761,8 +761,8 @@ export async function _makeCaptionXfadeSeg(
   const zpFrames = Math.max(1, Math.round(secondsPerImage * 30));
   const XF = 2.4;                                              // 文字が浮かび上がる時間（長め＝ゆっくり）
   const HOLD = Math.max(0.4, Math.min(0.9, secondsPerImage * 0.18)); // 文字が出る前の間（短め＝早く出る）
-  const padVf = "scale=854:480:force_original_aspect_ratio=decrease,pad=854:480:(ow-iw)/2:(oh-ih)/2:color=black";
-  const zoomVf = `zoompan=z='min(1.08,1+0.08*on/${zpFrames})':x='iw/2-(iw/zoom/2)':y='ih/2-(ih/zoom/2)':d=${zpFrames}:s=854x480:fps=24,format=yuv420p`;
+  const padVf = "scale=640:360:force_original_aspect_ratio=decrease,pad=640:360:(ow-iw)/2:(oh-ih)/2:color=black";
+  const zoomVf = `zoompan=z='min(1.08,1+0.08*on/${zpFrames})':x='iw/2-(iw/zoom/2)':y='ih/2-(ih/zoom/2)':d=${zpFrames}:s=640x360:fps=24,format=yuv420p`;
   const aDur = HOLD + XF;                                      // 文字なしパートの長さ
   const bDur = Math.max(XF + 0.3, secondsPerImage - HOLD + XF); // 文字ありパートの長さ
   // segA: 文字なし（頭に黒フェードイン）
@@ -840,7 +840,7 @@ export async function makeMixedMovieWithDucking(
           "-i", rawName,
           "-t", String(secondsPerImage),
           "-r", "30",
-          "-vf", "scale=854:480:force_original_aspect_ratio=decrease,pad=854:480:(ow-iw)/2:(oh-ih)/2:color=black,format=yuv420p",
+          "-vf", "scale=640:360:force_original_aspect_ratio=decrease,pad=640:360:(ow-iw)/2:(oh-ih)/2:color=black,format=yuv420p",
           "-c:v", "libx264", "-preset", "ultrafast",
           "-c:a", "aac", "-ar", "48000", "-ac", "2",
           inName,
@@ -849,11 +849,11 @@ export async function makeMixedMovieWithDucking(
         try { await ffmpeg.deleteFile(rawName); } catch {}
         const stampV = formatStamp(item.takenAt, timezone);
         const overlayPngV = await makeTextOverlayPNG(stampV, item.caption, item.spot);
-        const vBase = "scale=854:480:force_original_aspect_ratio=decrease,pad=854:480:(ow-iw)/2:(oh-ih)/2:color=black,format=yuv420p,fade=t=in:st=0:d=0.5";
+        const vBase = "scale=640:360:force_original_aspect_ratio=decrease,pad=640:360:(ow-iw)/2:(oh-ih)/2:color=black,format=yuv420p,fade=t=in:st=0:d=0.5";
         if (overlayPngV) {
           const txtNameV = `mdvtxt${idx}.png`;
           await ffmpeg.writeFile(txtNameV, overlayPngV);
-          const vScale = "scale=854:480:force_original_aspect_ratio=decrease,pad=854:480:(ow-iw)/2:(oh-ih)/2:color=black,format=yuv420p";
+          const vScale = "scale=640:360:force_original_aspect_ratio=decrease,pad=640:360:(ow-iw)/2:(oh-ih)/2:color=black,format=yuv420p";
           await ffmpeg.exec([
             "-i", inName,
             "-loop", "1", "-i", txtNameV,
@@ -886,7 +886,7 @@ export async function makeMixedMovieWithDucking(
         // 日付スタンプのテキストPNGを用意(takenAt があれば)
         const stamp = formatStamp(item.takenAt, timezone);
         const overlayPng = await makeTextOverlayPNG(stamp, item.caption, item.spot);
-        const baseVf = `scale=854:480:force_original_aspect_ratio=decrease,pad=854:480:(ow-iw)/2:(oh-ih)/2:color=black,format=yuv420p,fade=t=in:st=0:d=0.5,fade=t=out:st=${Math.max(0.6, secondsPerImage - 0.5)}:d=0.5`;
+        const baseVf = `scale=640:360:force_original_aspect_ratio=decrease,pad=640:360:(ow-iw)/2:(oh-ih)/2:color=black,format=yuv420p,fade=t=in:st=0:d=0.5,fade=t=out:st=${Math.max(0.6, secondsPerImage - 0.5)}:d=0.5`;
 
         if (overlayPng) {
           const txtName = `mdtxt${idx}.png`;
