@@ -403,7 +403,7 @@ async function makeTextOverlayPNG(
     if (jp) {
       ctx.shadowColor = "rgba(0,0,0,0.45)";
       ctx.shadowBlur = 12;
-      ctx.font = "300 56px 'Noto Serif JP', 'Yu Mincho', serif";
+      ctx.font = "300 44px 'Noto Serif JP', 'Yu Mincho', serif";
       ctx.fillStyle = "rgba(247,243,234,0.96)";
       ctx.fillText(jp, cx, cy);
       cy -= 34;
@@ -418,7 +418,7 @@ async function makeTextOverlayPNG(
       ctx.stroke();
       cy -= 22;
       ctx.shadowColor = "rgba(0,0,0,0.40)";
-      ctx.font = "300 26px 'Cormorant Garamond', 'Noto Serif JP', serif";
+      ctx.font = "300 22px 'Cormorant Garamond', 'Noto Serif JP', serif";
       ctx.fillStyle = "rgba(201,168,106,0.92)";
       const spaced = en.split("").join(" ");
       ctx.fillText(spaced, cx, cy);
@@ -430,7 +430,7 @@ async function makeTextOverlayPNG(
   if (text) {
     ctx.shadowColor = "rgba(0,0,0,0.40)";
     ctx.shadowBlur = 10;
-    ctx.font = "italic 24px 'Noto Serif JP', 'Yu Mincho', serif";
+    ctx.font = "italic 20px 'Noto Serif JP', 'Yu Mincho', serif";
     ctx.fillStyle = "rgba(247,243,234,0.78)";
     ctx.fillText(text, W - MX, ry);
     ry -= 34;
@@ -438,7 +438,7 @@ async function makeTextOverlayPNG(
   if (spotName) {
     ctx.shadowColor = "rgba(0,0,0,0.45)";
     ctx.shadowBlur = 10;
-    ctx.font = "300 30px 'Noto Serif JP', 'Yu Mincho', serif";
+    ctx.font = "300 24px 'Noto Serif JP', 'Yu Mincho', serif";
     ctx.fillStyle = "rgba(247,243,234,0.92)";
     ctx.fillText(spotName, W - MX, ry);
   }
@@ -466,13 +466,13 @@ export async function makeCoverPNG(title: string): Promise<Blob | null> {
 
   // 上の小さなブランド行
   ctx.fillStyle = "#8B7355";
-  ctx.font = "300 18px 'Cormorant Garamond', 'Noto Serif JP', serif";
+  ctx.font = "300 15px 'Cormorant Garamond', 'Noto Serif JP', serif";
   ctx.textAlign = "center";
   ctx.textBaseline = "middle";
   ctx.fillText("— T A B I   N O T E —", W / 2, H / 2 - 110);
 
   // タイトル(長い場合は縮小)
-  let size = 72;
+  let size = 58;
   ctx.font = `300 ${size}px 'Cormorant Garamond', 'Noto Serif JP', serif`;
   while (ctx.measureText(title).width > W - 200 && size > 28) {
     size -= 4;
