@@ -23,11 +23,48 @@ type Status =
   | { kind: 'error'; message: string };
 
 export function SettingsMenu({ onClose }: Props) {
-  const { lock } = useAuthStore();
+  const { lock, changePin } = useAuthStore();
   const { loadTrips } = useTripsStore();
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [status, setStatus] = useState<Status>({ kind: 'idle' });
   const [confirmImport, setConfirmImport] = useState<File | null>(null);
+
+  // PIN変更モーダル用
+  const [showChangePin, setShowChangePin] = useState(false);
+  const [curPin, setCurPin] = useState('');
+  const [newPin, setNewPin] = useState('');
+  const [newPin2, setNewPin2] = useState('');
+  const [pinError, setPinError] = useState<string | null>(null);
+  const [pinBusy, setPinBusy] = useState(false);
+
+  const resetPinForm = () => {
+    setShowChangePin(false);
+    setCurPin(''); setNewPin(''); setNewPin2('');
+    setPinError(null); setPinBusy(false);
+  };
+
+  const handleChangePin = async () => {
+    setPinError(null);
+    if (!/^\d{4}$/.test(curPin) || !/^\d{4}$/.test(newPin)) {
+      setPinError('PIN は 4 桁の数字で入力してください'); return;
+    }
+    if (newPin !== newPin2) {
+      setPinError('新しい PIN が一致しません'); return;
+    }
+    if (newPin === curPin) {
+      setPinError('現在と異なる PIN を設定してください'); return;
+    }
+    setPinBusy(true);
+    const ok = await changePin(curPin, newPin);
+    if (ok) {
+      resetPinForm();
+      setStatus({ kind: 'success', message: 'PIN を変更しました' });
+      setTimeout(() => setStatus({ kind: 'idle' }), 2500);
+    } else {
+      setPinBusy(false);
+      setPinError('現在の PIN が正しくありません');
+    }
+  };
 
   /* ───── エクスポート ───── */
   const handleExport = async () => {
@@ -141,6 +178,15 @@ export function SettingsMenu({ onClose }: Props) {
             className="hidden"
           />
 
+          {/* PIN を変更 */}
+          <MenuItem
+            label="CHANGE PIN"
+            labelJa="PIN を変更"
+            description="アプリのロック解除に使う 4 桁の PIN を変更します。"
+            onClick={() => setShowChangePin(true)}
+            disabled={isBusy}
+          />
+
           {/* 今すぐロック */}
           <MenuItem
             label="LOCK NOW"
@@ -175,6 +221,80 @@ export function SettingsMenu({ onClose }: Props) {
         {/* フッタースペース */}
         <div className="h-6" />
       </div>
+
+      {/* PIN変更モーダル */}
+      {showChangePin && (
+        <div
+          className="fixed inset-0 z-[60] bg-text/60 flex items-center justify-center px-6"
+          onClick={(e) => e.stopPropagation()}
+        >
+          <div className="bg-bg max-w-[360px] w-full p-7 border border-line shadow-2xl">
+            <p className="font-serif italic text-[11px] tracking-[0.3em] text-accent uppercase mb-3">
+              — Change PIN
+            </p>
+            <h3 className="font-serif text-[22px] text-text mb-5 tracking-tight">
+              PIN を変更
+            </h3>
+
+            <div className="space-y-4">
+              <div>
+                <label className="font-serif-ja text-[11px] text-text-sub block mb-1">現在の PIN</label>
+                <input
+                  type="password"
+                  inputMode="numeric"
+                  maxLength={4}
+                  value={curPin}
+                  onChange={(e) => setCurPin(e.target.value.replace(/[^0-9]/g, ''))}
+                  className="w-full py-2 px-3 border border-line bg-bg-alt text-text tracking-[0.5em] text-center text-[18px]"
+                />
+              </div>
+              <div>
+                <label className="font-serif-ja text-[11px] text-text-sub block mb-1">新しい PIN(4桁)</label>
+                <input
+                  type="password"
+                  inputMode="numeric"
+                  maxLength={4}
+                  value={newPin}
+                  onChange={(e) => setNewPin(e.target.value.replace(/[^0-9]/g, ''))}
+                  className="w-full py-2 px-3 border border-line bg-bg-alt text-text tracking-[0.5em] text-center text-[18px]"
+                />
+              </div>
+              <div>
+                <label className="font-serif-ja text-[11px] text-text-sub block mb-1">新しい PIN(確認)</label>
+                <input
+                  type="password"
+                  inputMode="numeric"
+                  maxLength={4}
+                  value={newPin2}
+                  onChange={(e) => setNewPin2(e.target.value.replace(/[^0-9]/g, ''))}
+                  className="w-full py-2 px-3 border border-line bg-bg-alt text-text tracking-[0.5em] text-center text-[18px]"
+                />
+              </div>
+            </div>
+
+            {pinError && (
+              <p className="font-serif-ja text-[12px] text-red-700 mt-4">⚠ {pinError}</p>
+            )}
+
+            <div className="flex gap-3 mt-6">
+              <button
+                onClick={resetPinForm}
+                disabled={pinBusy}
+                className="flex-1 py-3 border border-line font-serif italic text-[12px] tracking-[0.2em] uppercase text-text-sub hover:bg-bg-alt"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={handleChangePin}
+                disabled={pinBusy}
+                className="flex-1 py-3 bg-text text-bg font-serif italic text-[12px] tracking-[0.2em] uppercase hover:opacity-90"
+              >
+                {pinBusy ? '変更中…' : 'Change'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* インポート確認ダイアログ */}
       {confirmImport && (
