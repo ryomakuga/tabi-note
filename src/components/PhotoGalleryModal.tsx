@@ -217,7 +217,14 @@ function GalleryCell({ photo, className, onClick }: { photo: Photo; className: s
 
 function PhotoImage({ photo }: { photo: Photo }) {
   const [url, setUrl] = useState<string | null>(null);
+  const [thumbUrl, setThumbUrl] = useState<string | null>(null);
   const isVideo = photo.blob.type.startsWith('video/');
+  useEffect(() => {
+    if (!photo.thumbBlob) { setThumbUrl(null); return; }
+    const tu = URL.createObjectURL(photo.thumbBlob);
+    setThumbUrl(tu);
+    return () => URL.revokeObjectURL(tu);
+  }, [photo.thumbBlob]);
   useEffect(() => {
     const u = URL.createObjectURL(photo.blob);
     setUrl(u);
@@ -227,7 +234,11 @@ function PhotoImage({ photo }: { photo: Photo }) {
   if (isVideo) {
     return (
       <div className="relative w-full h-full">
-        <video src={`${url}#t=0.1`} className="w-full h-full object-cover" muted playsInline preload="metadata" />
+        {thumbUrl ? (
+          <img src={thumbUrl} alt={photo.filename} className="w-full h-full object-cover" loading="lazy" />
+        ) : (
+          <video src={`${url}#t=0.1`} className="w-full h-full object-cover" muted playsInline preload="metadata" />
+        )}
         <span className="absolute inset-0 flex items-center justify-center pointer-events-none">
           <span className="text-bg text-[20px]">▶</span>
         </span>
