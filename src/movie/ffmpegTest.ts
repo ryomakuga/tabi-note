@@ -472,7 +472,7 @@ export async function makeCoverPNG(title: string): Promise<Blob | null> {
   ctx.fillText("— T A B I   N O T E —", W / 2, H / 2 - 110);
 
   // タイトル(長い場合は縮小)
-  let size = 58;
+  let size = 52;
   ctx.font = `300 ${size}px 'Cormorant Garamond', 'Noto Serif JP', serif`;
   while (ctx.measureText(title).width > W - 200 && size > 28) {
     size -= 4;
