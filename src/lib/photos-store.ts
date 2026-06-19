@@ -4,60 +4,99 @@ import type { Photo } from './types';
 
 async function makeVideoThumb(file: File): Promise<Blob | undefined> {
   return new Promise((resolve) => {
+    let done = false;
+    let url = "";
+    const v = document.createElement("video");
+
+    const fail = (code: string) => {
+      // 失敗時:原因コードを焼いた小さな画像を返す(画面で原因が見える)
+      try {
+        const c = document.createElement("canvas");
+        c.width = 320; c.height = 320;
+        const ctx = c.getContext("2d");
+        if (ctx) {
+          ctx.fillStyle = "#DDD3C0";
+          ctx.fillRect(0, 0, 320, 320);
+          ctx.fillStyle = "#8B7355";
+          ctx.font = "bold 40px sans-serif";
+          ctx.textAlign = "center";
+          ctx.fillText(code, 160, 175);
+          c.toBlob((b) => finish(b || undefined), "image/jpeg", 0.7);
+          return;
+        }
+      } catch {}
+      finish(undefined);
+    };
+
+    const finish = (b?: Blob) => {
+      if (done) return;
+      done = true;
+      try { v.pause(); } catch {}
+      if (url) URL.revokeObjectURL(url);
+      resolve(b);
+    };
+
+    const draw = (tag: string) => {
+      try {
+        const w = v.videoWidth, h = v.videoHeight;
+        if (!w || !h) { fail("NOSIZE"); return; }
+        const c = document.createElement("canvas");
+        c.width = w; c.height = h;
+        const ctx = c.getContext("2d");
+        if (!ctx) { fail("NOCTX"); return; }
+        ctx.drawImage(v, 0, 0, w, h);
+        // 真っ黒チェック:中央1pxを見て、ほぼ黒なら失敗扱い
+        try {
+          const px = ctx.getImageData(Math.floor(w / 2), Math.floor(h / 2), 1, 1).data;
+          if (px[0] < 8 && px[1] < 8 && px[2] < 8) { fail("BLACK:" + tag); return; }
+        } catch {}
+        c.toBlob((b) => finish(b || undefined), "image/jpeg", 0.7);
+      } catch {
+        fail("DRAWERR");
+      }
+    };
+
     try {
-      const v = document.createElement("video");
       v.muted = true;
       v.playsInline = true;
       v.setAttribute("muted", "");
       v.setAttribute("playsinline", "");
       v.preload = "auto";
-      const url = URL.createObjectURL(file);
+      url = URL.createObjectURL(file);
       v.src = url;
-      let done = false;
-      let captured = false;
-      const finish = (b?: Blob) => {
-        if (done) return;
-        done = true;
-        try { v.pause(); } catch {}
-        URL.revokeObjectURL(url);
-        resolve(b);
-      };
-      const capture = () => {
-        if (captured) return;
-        captured = true;
-        try {
-          const c = document.createElement("canvas");
-          c.width = v.videoWidth || 320;
-          c.height = v.videoHeight || 320;
-          const ctx = c.getContext("2d");
-          if (ctx) {
-            ctx.drawImage(v, 0, 0, c.width, c.height);
-            c.toBlob((b) => finish(b || undefined), "image/jpeg", 0.7);
-            return;
-          }
-        } catch {}
-        finish(undefined);
-      };
-      const seekToFrame = () => {
+
+      // 最有力:フレームが描画可能になった瞬間に捕まえる(iOS16+)
+      const anyV = v as any;
+      const hasRVFC = typeof anyV.requestVideoFrameCallback === "function";
+
+      v.addEventListener("loadedmetadata", () => {
         try {
           const t = isFinite(v.duration) && v.duration > 0.3 ? 0.1 : 0;
           v.currentTime = t;
-        } catch { capture(); }
-      };
-      // iOS はデコーダを起こさないと seek/描画が効かないので一瞬再生する
-      v.addEventListener("loadedmetadata", () => {
+        } catch {}
+        // デコーダを起こす
         v.play().then(() => {
-          // 再生でフレームがデコードされたら止めて目的位置へ
-          setTimeout(() => { try { v.pause(); } catch {} seekToFrame(); }, 120);
-        }).catch(() => { seekToFrame(); });
+          if (hasRVFC) {
+            anyV.requestVideoFrameCallback(() => {
+              try { v.pause(); } catch {}
+              draw("RVFC");
+            });
+          } else {
+            setTimeout(() => { try { v.pause(); } catch {} draw("PLAY"); }, 300);
+          }
+        }).catch(() => {
+          // 自動再生拒否 → seek 完了に賭ける
+          v.addEventListener("seeked", () => draw("SEEK"), { once: true });
+          try { v.currentTime = 0.1; } catch { fail("NOPLAY"); }
+        });
       });
-      v.addEventListener("seeked", () => { capture(); });
-      v.addEventListener("error", () => finish(undefined));
-      setTimeout(() => { if (!done) capture(); }, 4000);
-      setTimeout(() => finish(undefined), 6000);
+
+      v.addEventListener("error", () => fail("VIDERR"));
+      // 保険:6秒で締める
+      setTimeout(() => { if (!done) fail("TIMEOUT"); }, 6000);
       v.load();
     } catch {
-      resolve(undefined);
+      fail("INIT");
     }
   });
 }
