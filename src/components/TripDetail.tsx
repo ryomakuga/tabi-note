@@ -43,6 +43,22 @@ export function TripDetail() {
   const [isTripEditOpen, setIsTripEditOpen] = useState(false);
   const [isShareModalOpen, setIsShareModalOpen] = useState(false);
 
+  // 旅の削除用
+  const deleteTrip = useTripsStore((s) => s.deleteTrip);
+  const [isDeleteOpen, setIsDeleteOpen] = useState(false);
+  const [isDeleting, setIsDeleting] = useState(false);
+
+  const handleDeleteTrip = async () => {
+    if (!trip) return;
+    setIsDeleting(true);
+    try {
+      await deleteTrip(trip.id);
+      closeTrip();
+    } catch {
+      setIsDeleting(false);
+    }
+  };
+
   useEffect(() => {
     if (selectedTripId) loadFlights(selectedTripId);
   }, [selectedTripId, loadFlights]);
@@ -88,6 +104,10 @@ export function TripDetail() {
         <div className="text-center pb-6 border-b border-line mb-9">
           <p className="font-serif text-[11px] tracking-[0.45em] uppercase text-accent mb-1.5">Tabi Note</p>
           <p className="font-sans text-[9px] tracking-[0.35em] uppercase text-text-sub">Issue 01 · {trip.destination}</p>
+        </div>
+
+        <div className="flex justify-end mb-6">
+          <button onClick={() => setIsDeleteOpen(true)} className="font-serif italic text-[12px] tracking-[0.15em] text-secondary hover:text-red-700 transition-colors">delete ⌁</button>
         </div>
 
         <div className="mb-10">
@@ -209,6 +229,25 @@ export function TripDetail() {
       {isFlightModalOpen && (
         <FlightFormModal tripId={trip.id} flight={editingFlight} onClose={() => { setIsFlightModalOpen(false); setEditingFlight(undefined); }} />
       )}
+      {/* 削除確認モーダル */}
+      {isDeleteOpen && (
+        <div className="fixed inset-0 z-[60] bg-text/60 flex items-center justify-center px-6" onClick={() => !isDeleting && setIsDeleteOpen(false)}>
+          <div className="bg-bg max-w-[360px] w-full p-7 border border-line shadow-2xl" onClick={(e) => e.stopPropagation()}>
+            <p className="font-serif italic text-[11px] tracking-[0.3em] text-red-700 uppercase mb-3">— Delete</p>
+            <h3 className="font-serif text-[22px] text-text mb-4 tracking-tight">この旅を削除しますか？</h3>
+            <p className="font-serif-ja text-[12px] text-text-sub leading-relaxed mb-6">
+              「{trip.title}」を削除します。この操作は取り消せません。心配な場合は、先に設定からバックアップを書き出してください。
+            </p>
+            <div className="flex gap-3">
+              <button onClick={() => setIsDeleteOpen(false)} disabled={isDeleting} className="flex-1 py-3 border border-line font-serif italic text-[12px] tracking-[0.2em] uppercase text-text-sub hover:bg-bg-alt">Cancel</button>
+              <button onClick={handleDeleteTrip} disabled={isDeleting} className="flex-1 py-3 bg-red-700 text-bg font-serif italic text-[12px] tracking-[0.2em] uppercase hover:opacity-90">
+                {isDeleting ? '削除中…' : 'Delete'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
       {isShareModalOpen && (
         <ShareModal tripId={trip.id} tripTitle={trip.title} onClose={() => setIsShareModalOpen(false)} />
       )}
