@@ -35,3 +35,9 @@ Thumbs.db
 src/**/CleanShot*.png
 src/**/Screenshot*.png
 src/**/*.tmp.png
+
+# バックアップファイル(.bak, .bak2, .bak_thumb など)
+*.bak
+*.bak[0-9]
+*.bak.*
+*.bak_*
