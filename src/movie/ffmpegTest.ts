@@ -379,7 +379,7 @@ async function makeTextOverlayPNG(
   const spotName = spot?.trim() || "";
   if (!text && !jp && !en && !spotName) return null;
 
-  const W = 1280, H = 720;
+  const W = 854, H = 480;
   const canvas = document.createElement("canvas");
   canvas.width = W;
   canvas.height = H;
@@ -453,7 +453,7 @@ async function makeTextOverlayPNG(
 // 854x480 のベージュ背景にタイトルを中央配置して PNG Blob で返す。
 export async function makeCoverPNG(title: string): Promise<Blob | null> {
   if (!title) return null;
-  const W = 1280, H = 720;
+  const W = 854, H = 480;
   const canvas = document.createElement("canvas");
   canvas.width = W;
   canvas.height = H;
