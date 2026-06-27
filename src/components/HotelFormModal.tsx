@@ -218,6 +218,20 @@ export function HotelFormModal({ tripId, hotel, onClose }: Props) {
                 >
                   📋  クリップボードから座標を取得
                 </button>
+                <input
+                  type="text"
+                  inputMode="url"
+                  placeholder="うまくいかない時はURLをここに貼り付け"
+                  onChange={(e) => {
+                    const coords = extractCoordsFromMapsUrl(e.target.value);
+                    if (coords) {
+                      setLat(String(coords.lat));
+                      setLng(String(coords.lng));
+                      setCoordsError(null);
+                    }
+                  }}
+                  className="form-input mt-2 text-[12px]"
+                />
               </div>
 
               {coordsError && (
