@@ -537,6 +537,11 @@ function MealCard({ meal, index, onEdit }: { meal: Meal; index: number; onEdit: 
             )}
           </div>
           {meal.memo && (<p className="font-serif-ja text-[11px] text-text-sub leading-relaxed mt-2 line-clamp-2">{meal.memo}</p>)}
+          {meal.mapUrl && (
+            <div className="mt-3">
+              <ExternalLink href={meal.mapUrl} variant="inline">— 地図を開く</ExternalLink>
+            </div>
+          )}
           {meal.urls && meal.urls.length > 0 && (
             <div className="mt-3 space-y-1.5 overflow-hidden">
               {meal.urls.map((url, i) => (
