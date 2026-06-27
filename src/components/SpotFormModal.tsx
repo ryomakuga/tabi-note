@@ -18,6 +18,9 @@ export function SpotFormModal({ tripId, spot, onClose }: Props) {
   const [name, setName] = useState(spot?.name ?? '');
   const [nameLocal, setNameLocal] = useState(spot?.nameLocal ?? '');
   const [status, setStatus] = useState<'draft' | 'confirmed'>(spot?.status ?? 'draft');
+  const [scheduledAt, setScheduledAt] = useState(
+    spot?.scheduledAt ? toLocalDateTime(spot.scheduledAt) : ''
+  );
   const [memo, setMemo] = useState(spot?.memo ?? '');
   const [urls, setUrls] = useState<string[]>(spot?.urls ?? []);
   const [lat, setLat] = useState<string>(spot?.lat != null ? String(spot.lat) : '');
@@ -47,6 +50,9 @@ export function SpotFormModal({ tripId, spot, onClose }: Props) {
         name: name.trim(),
         nameLocal: nameLocal.trim(),
         status,
+        scheduledAt: status === 'confirmed' && scheduledAt
+          ? new Date(scheduledAt).toISOString()
+          : undefined,
         memo: memo.trim() || undefined,
         urls: urls.length > 0 ? urls : undefined,
         lat: latNum,
@@ -139,9 +145,22 @@ export function SpotFormModal({ tripId, spot, onClose }: Props) {
               </button>
             </div>
             <p className="font-serif-ja text-[10px] text-text-sub/80 mt-2 italic">
-              {status === 'draft' ? '候補:行きたいリストに追加' : '確定:訪問予定として記録'}
+              {status === 'draft' ? '候補:行きたいリストに追加' : '確定:日時を指定してタイムラインへ'}
             </p>
           </Field>
+          {status === 'confirmed' && (
+            <Field label="SCHEDULED" labelJa="日時" optional>
+              <input
+                type="datetime-local"
+                value={scheduledAt}
+                onChange={(e) => setScheduledAt(e.target.value)}
+                className="form-input"
+              />
+              <p className="font-serif-ja text-[10px] text-text-sub/70 mt-1 italic">
+                指定するとタイムラインに表示されます
+              </p>
+            </Field>
+          )}
 
           <Field label="MEMO" labelJa="メモ" optional>
             <textarea
@@ -331,4 +350,11 @@ function Field({
       {children}
     </div>
   );
+}
+
+
+function toLocalDateTime(iso: string): string {
+  const d = new Date(iso);
+  const tzOffset = d.getTimezoneOffset() * 60000;
+  return new Date(d.getTime() - tzOffset).toISOString().slice(0, 16);
 }
