@@ -18,12 +18,17 @@ export function ExternalLink({ href, variant = 'inline', children, className = '
 
   const label = children ?? getDomain(href);
 
+  // http(s) が無いURLは相対リンク扱いになりトップに戻るため https:// を補う
+  const safeHref = /^https?:\/\//i.test(href.trim())
+    ? href.trim()
+    : `https://${href.trim()}`;
+
   const common = {
-    href,
+    href: safeHref,
     target: '_blank',
     rel: 'noopener noreferrer',
     onClick: handleClick,
-    title: href,
+    title: safeHref,
   };
 
   if (variant === 'compact') {
