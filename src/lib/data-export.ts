@@ -8,7 +8,7 @@
 
 import { db } from './db';
 import type { Trip, Flight, Hotel, Spot, Meal, Photo } from './types';
-import { encrypt, decrypt } from './crypto';
+import { decrypt, encryptBytes, decryptBytes } from './crypto';
 import type { EncryptedData } from './crypto';
 
 /* ───────── エクスポート形式 ───────── */
@@ -232,14 +232,76 @@ export async function buildShareData(tripId: string): Promise<ShareData> {
   };
 }
 
+/* ───────── 共有ペイロードのバイナリ形式 ─────────
+   payload = base64url( version(1) + salt(16) + iv(12) + ciphertext )
+
+   version 0x01: 平文 JSON を deflate-raw で圧縮してから AES-256-GCM
+   version 0x02: 圧縮なし(CompressionStream が使えない環境のフォールバック)
+
+   旧形式(2026-05 に生成した URL)は base64url( JSON{ciphertext,iv,salt} ) で、
+   復号すると先頭バイトが '{'(0x7B)になる。version バイトにこの値は使わない。
+   ───────────────────────────────────────── */
+const SHARE_FORMAT_DEFLATE = 0x01;
+const SHARE_FORMAT_PLAIN = 0x02;
+const LEGACY_JSON_FIRST_BYTE = 0x7b; // '{'
+
+function canUseDeflate(): boolean {
+  try {
+    if (typeof CompressionStream === 'undefined') return false;
+    // 'deflate-raw' 非対応の実装はここで例外になる
+    new CompressionStream('deflate-raw');
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+function canUseInflate(): boolean {
+  try {
+    if (typeof DecompressionStream === 'undefined') return false;
+    new DecompressionStream('deflate-raw');
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+async function deflateRaw(input: Uint8Array<ArrayBuffer>): Promise<Uint8Array<ArrayBuffer>> {
+  const stream = new Blob([input]).stream().pipeThrough(new CompressionStream('deflate-raw'));
+  return new Uint8Array(await new Response(stream).arrayBuffer());
+}
+
+async function inflateRaw(input: Uint8Array<ArrayBuffer>): Promise<Uint8Array<ArrayBuffer>> {
+  const stream = new Blob([input]).stream().pipeThrough(new DecompressionStream('deflate-raw'));
+  return new Uint8Array(await new Response(stream).arrayBuffer());
+}
+
 export async function encryptShareData(
   data: ShareData,
   sharePin: string
 ): Promise<string> {
-  const json = JSON.stringify(data);
-  const encrypted = await encrypt(json, sharePin);
-  const payload = JSON.stringify(encrypted);
-  return bytesToBase64Url(stringToBytes(payload));
+  const json = stringToBytes(JSON.stringify(data));
+
+  // 圧縮できる環境なら deflate-raw、無理なら非圧縮。version バイトで区別する
+  let version = SHARE_FORMAT_PLAIN;
+  let body: Uint8Array<ArrayBuffer> = json;
+  if (canUseDeflate()) {
+    try {
+      const packed = await deflateRaw(json);
+      if (packed.length < json.length) {
+        body = packed;
+        version = SHARE_FORMAT_DEFLATE;
+      }
+    } catch (e) {
+      console.warn('共有データの圧縮に失敗したため非圧縮で続行します:', e);
+    }
+  }
+
+  const encrypted = await encryptBytes(body, sharePin);
+  const out = new Uint8Array(1 + encrypted.length);
+  out[0] = version;
+  out.set(encrypted, 1);
+  return bytesToBase64Url(out);
 }
 
 export function buildShareUrl(encryptedPayload: string): string {
@@ -261,9 +323,32 @@ export async function decryptShareData(
   payload: string,
   sharePin: string
 ): Promise<ShareData> {
-  const json = bytesToString(base64UrlToBytes(payload));
-  const encrypted = JSON.parse(json) as EncryptedData;
-  const decryptedJson = await decrypt(encrypted, sharePin);
+  const bytes = base64UrlToBytes(payload);
+  if (bytes.length === 0) {
+    throw new Error('共有データが空です。');
+  }
+
+  let decryptedJson: string;
+  if (bytes[0] === LEGACY_JSON_FIRST_BYTE) {
+    // 旧形式: base64url( JSON{ciphertext,iv,salt} )
+    const encrypted = JSON.parse(bytesToString(bytes)) as EncryptedData;
+    decryptedJson = await decrypt(encrypted, sharePin);
+  } else {
+    const version = bytes[0];
+    if (version !== SHARE_FORMAT_DEFLATE && version !== SHARE_FORMAT_PLAIN) {
+      throw new Error(`未対応の共有データ形式です(version ${version})。アプリを最新版に更新してください。`);
+    }
+    const plain = await decryptBytes(bytes.subarray(1), sharePin);
+    if (version === SHARE_FORMAT_DEFLATE) {
+      if (!canUseInflate()) {
+        throw new Error('この端末では圧縮された共有URLを開けません。iOS 16.4 以降、または最新の Chrome / Safari をお使いください。');
+      }
+      decryptedJson = bytesToString(await inflateRaw(plain));
+    } else {
+      decryptedJson = bytesToString(plain);
+    }
+  }
+
   const data = JSON.parse(decryptedJson) as unknown;
   if (!validateShareData(data)) {
     throw new Error('共有データの形式が正しくありません。');
@@ -397,7 +482,7 @@ function base64UrlToBytes(base64url: string): Uint8Array {
   return base64ToBytes(base64);
 }
 
-function stringToBytes(str: string): Uint8Array {
+function stringToBytes(str: string): Uint8Array<ArrayBuffer> {
   return new TextEncoder().encode(str);
 }
 

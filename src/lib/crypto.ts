@@ -109,6 +109,64 @@ export async function decrypt(
   return decoder.decode(decrypted);
 }
 
+/* ═══════════════════════════════════════════
+   バイナリ版 暗号化 / 復号(共有URL用)
+   - 入出力とも Uint8Array
+   - 出力は salt(16) + iv(12) + ciphertext(GCM タグ 16 バイトを含む) を連結
+   - Base64 化は呼び出し側で 1 回だけ行う(JSON ラッパーを挟まない)
+═══════════════════════════════════════════ */
+
+export const SALT_BYTES = SALT_LENGTH;
+export const IV_BYTES = IV_LENGTH;
+const GCM_TAG_BYTES = 16;
+
+/**
+ * バイト列を暗号化して salt + iv + ciphertext の連結を返す
+ */
+export async function encryptBytes(
+  plain: Uint8Array,
+  pin: string
+): Promise<Uint8Array<ArrayBuffer>> {
+  const salt = new Uint8Array(SALT_LENGTH);
+  const iv = new Uint8Array(IV_LENGTH);
+  crypto.getRandomValues(salt);
+  crypto.getRandomValues(iv);
+
+  const key = await deriveKey(pin, salt.buffer);
+  // 呼び出し側の buffer が SharedArrayBuffer 由来でも扱えるようコピーして渡す
+  const input = new Uint8Array(plain.length);
+  input.set(plain);
+  const ciphertext = new Uint8Array(
+    await crypto.subtle.encrypt({ name: 'AES-GCM', iv }, key, input)
+  );
+
+  const out = new Uint8Array(SALT_LENGTH + IV_LENGTH + ciphertext.length);
+  out.set(salt, 0);
+  out.set(iv, SALT_LENGTH);
+  out.set(ciphertext, SALT_LENGTH + IV_LENGTH);
+  return out;
+}
+
+/**
+ * encryptBytes の出力(salt + iv + ciphertext)を復号してバイト列を返す
+ * PIN が違う場合は AES-GCM の認証に失敗して例外(OperationError)になる
+ */
+export async function decryptBytes(
+  data: Uint8Array,
+  pin: string
+): Promise<Uint8Array<ArrayBuffer>> {
+  if (data.length < SALT_LENGTH + IV_LENGTH + GCM_TAG_BYTES) {
+    throw new Error('暗号データが短すぎます。');
+  }
+  const salt = data.slice(0, SALT_LENGTH);
+  const iv = data.slice(SALT_LENGTH, SALT_LENGTH + IV_LENGTH);
+  const ciphertext = data.slice(SALT_LENGTH + IV_LENGTH);
+
+  const key = await deriveKey(pin, salt.buffer);
+  const plain = await crypto.subtle.decrypt({ name: 'AES-GCM', iv }, key, ciphertext);
+  return new Uint8Array(plain);
+}
+
 /**
  * ArrayBuffer を Base64 文字列に変換
  */
