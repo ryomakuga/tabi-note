@@ -1031,3 +1031,50 @@ Safari は LAN IP の http:// を Insecure Context と判定し、Web Crypto API
 2. 実機iPhoneでのPWA通しテスト(出発6/28前)
 ### 安全地点
 - 最新: `ccdb381`。戻る時はこのSHAへ。
+
+---
+
+## 2026-09-06 共有URLの短縮(二重Base64の解消 + deflate圧縮)+ Vercel 本番デプロイ
+
+### 背景
+F-12 共有URLが 5,000〜7,000 文字と長すぎ、LINE 等で途中で切れて復号に失敗する原因になっていた。
+原因は 2 つ:(1) `crypto.ts` の `encrypt` が Base64 文字列を返し、`data-export.ts` でその JSON をもう一度 base64url にかけていた(二重 Base64 で約 1.8 倍)。(2) 平文 JSON を圧縮していなかった。
+5/19 に「LZ-String で 1.2% しか縮まない」と記録したのは暗号化後のデータを圧縮していたためで、暗号化前の JSON なら大きく縮む。
+
+### 変更内容(コミット `6be9817`)
+- **`src/lib/crypto.ts`**: `encryptBytes` / `decryptBytes` を追加。salt(16) + iv(12) + 暗号文をバイナリ連結して返し、Base64 化は呼び出し側で 1 回だけにした。既存の `encrypt` / `decrypt`(PIN 検証と旧形式の復号)はそのまま。
+- **`src/lib/data-export.ts`**: 共有ペイロードを新形式に変更。
+  ```
+  payload = base64url( version(1) + salt(16) + iv(12) + ciphertext )
+    version 0x01: 平文JSON を CompressionStream('deflate-raw') で圧縮してから AES-256-GCM
+    version 0x02: 圧縮なし(CompressionStream が使えない環境のフォールバック。圧縮しても縮まない場合も同様)
+  ```
+- **後方互換**: 旧形式(5 月生成の URL)は先頭バイトが `{`(0x7B)なので自動判別し、従来どおり `decrypt` で復号。未知の version と、受信側に `DecompressionStream` が無い場合は明示エラー。
+- ShareModal / ReceiveModal の見た目・操作は変更なし。
+- 変更前のファイルは `crypto.ts.bak_urlshort` / `data-export.ts.bak_urlshort` に保存(git 対象外)。
+
+### URL 長の見込み(Node で実コードを使って計測。代表データはダナン旅行相当)
+| データ | 平文JSON | 旧形式 | 新形式 | 削減 |
+|---|---|---|---|---|
+| フライト2・ホテル1・スポット2・食事1 | 3,420 文字 | 6,916 文字 | 2,284 文字 | 約 1/3 |
+| ホテル2・スポット6・食事4 | 7,486 文字 | 14,895 文字 | 2,711 文字 | 約 1/5 |
+| 圧縮なしフォールバック時(代表データ) | 3,420 文字 | 6,916 文字 | 5,150 文字 | 26% 減 |
+代表データで QR コード上限(2,953 バイト)に収まる長さになった。
+
+### 検証
+- `npx tsc --noEmit` エラー 0、`npm run build` 成功、eslint(変更 2 ファイル)エラー 0
+- Node で git HEAD の旧コードと新コードを esbuild でバンドルして検証:新形式の往復一致、旧形式 URL を新コードで復号可、PIN 誤り・末尾欠損は例外、CompressionStream 無しで 0x02 生成 → 復号可、DecompressionStream 無しは明示エラー、未知 version は明示エラー
+- 注意: **旧アプリは新形式を復号できない**。送る側・受け取る側の両方が最新版を読み込んでいる必要がある。
+
+### デプロイ
+- デプロイは GitHub 連携(main への push で Vercel が本番ビルド)。Vercel CLI や `.vercel` は使っていない。
+- **本番 URL: https://tabi-note-six.vercel.app/**(Vercel プロジェクト `ryomakuga-s-projects/tabi-note`)。`tabi-note.vercel.app`(接尾辞なし)は他人のプロジェクトなので注意。
+- push 後約 2 分で Status: Ready(ソース main / 6be9817)。本番で HTTP 200、COOP/COEP ヘッダー、配信バンドルに新コードが含まれること、ロック画面の描画、`crossOriginIsolated` = true を確認。
+
+### 次回やること
+1. iPhone 実機で共有URLの生成 → 受信の通しテスト(iOS 16.4 以降が必要)。5 月に作った旧 URL があればそれも開けるか確認
+2. 6/12〜6/27 の変更(xfade 撤去 → 焼き込み方式、360p/20fps 化、PIN 変更、旅の削除、iPhone 向け座標入力など)がこのログに未記載なので追記する
+3. 共有まわりの残課題:iOS で LINE のリンクが Safari で開きホーム画面アプリと別ストレージに入る問題、`hashchange` 未対応、重複インポート防止
+
+### 安全地点
+- 最新: `6be9817`(共有URL短縮)。問題があれば `44f1310` に戻す。
