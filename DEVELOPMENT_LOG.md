@@ -1078,3 +1078,40 @@ F-12 共有URLが 5,000〜7,000 文字と長すぎ、LINE 等で途中で切れ�
 
 ### 安全地点
 - 最新: `6be9817`(共有URL短縮)。問題があれば `44f1310` に戻す。
+
+---
+
+## Step 22 — バックアップに BGM とムービーを追加(2026-09-06)
+
+### 見つかった不具合
+バックアップの書き出し JSON に `musicTracks` と `movies` が含まれていなかった。トップレベルは
+`formatVersion / exportedAt / appName / trips / flights / hotels / spots / meals / photos` のみ。
+BGM と作成済みムービーはバックアップを取っても復元されず、静かに失われる状態だった。
+Chrome の実データで確認(localhost の IndexedDB に BGM 3件 13.7MB、ムービー 1件 0.6MB が存在)。
+
+### 変更(src/lib/data-export.ts のみ)
+- `MusicTrackExport` / `MovieExport` インターフェースを追加(Blob は Base64 化して保持、MIME も保存)
+- `ExportData` に `musicTracks?` / `movies?` を追加。**旧形式のバックアップには存在しないので任意**にして互換を保つ
+- `exportAllData` で `db.musicTracks` / `db.movies` も読み出して書き出す
+- `importDataFromJson` のトランザクション対象に 2 テーブルを追加し、`data.musicTracks ?? []` で復元。旧バックアップは空配列として扱う
+- `ImportResult` に `musicTracks` / `movies` の件数を追加
+- `validateExportData` は変更なし(2 項目を必須にすると旧バックアップが弾かれるため)
+- 変更前のファイルは `data-export.ts.bak_musictracks` に保存(git 対象外)
+
+### 検証(Chrome を直接操作して実施)
+- `npx tsc --noEmit` エラー 0 / eslint(data-export.ts)エラー 0
+- 書き出し: トップレベルに `musicTracks` / `movies` が出現。44.8MB → 61.9MB。BGM 3件(swimmer.mp3 / tabi-note-movie.mp4 / Summer_We_Left_Behind.mp3)、ムービー 1件(movie-2026-06-17.mp4)を確認
+- 読み込み: その JSON を RESTORE。エラー 0、約 25 秒。BGM 3件・ムービー 1件が復元され、MIME も `audio/mpeg` / `video/mp4` として保持。旅 1件・写真 24件は重複せず据え置き
+- `npm run build` はこのセッションの Linux VM では実行できない(node_modules が macOS ARM 向けで `@rolldown/binding-linux-arm64-gnu` が無い)。Mac のターミナルで実行するか、Vercel の本番ビルドで確認する
+
+### 補足(今回わかったこと)
+- 「データの移行ができない」という報告は、バックアップ機能の不具合ではなく **共有 URL が長すぎる問題と同一原因**だった。受け取った旧形式 URL はちょうど 10,000 文字で切られており(欄の maxLength は -1 = 無制限)、経路側で打ち切られたと確定。切れた URL は復元不可
+- 新形式の共有 URL は実測 2,336 文字(版番号バイト 0x01 = deflate 圧縮あり)。生成 → 別画面で復号までブラウザ上で通しテスト済み
+
+### 次回やること
+1. Mac のターミナルで `npm run build` を通し、push して本番へ反映する
+2. マレーシアの旅は、共有元に最新版アプリで URL を作り直してもらってから取り込む
+3. 以前からの残課題:iOS のストレージ分離、`hashchange` 未対応、重複インポート防止、旅削除時の孤児データ、日時のタイムゾーン依存、ffmpeg インスタンスのリーク
+
+### 安全地点
+- 変更は `src/lib/data-export.ts` のみ。問題があれば `data-export.ts.bak_musictracks` に戻す。

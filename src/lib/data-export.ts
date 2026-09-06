@@ -7,7 +7,7 @@
 // ============================================
 
 import { db } from './db';
-import type { Trip, Flight, Hotel, Spot, Meal, Photo } from './types';
+import type { Trip, Flight, Hotel, Spot, Meal, Photo, MusicTrack, Movie } from './types';
 import { decrypt, encryptBytes, decryptBytes } from './crypto';
 import type { EncryptedData } from './crypto';
 
@@ -23,6 +23,9 @@ export interface ExportData {
   spots: Spot[];
   meals: Meal[];
   photos: PhotoExport[];
+  /** 旧形式のバックアップには存在しないため任意 */
+  musicTracks?: MusicTrackExport[];
+  movies?: MovieExport[];
 }
 
 interface PhotoExport {
@@ -35,6 +38,23 @@ interface PhotoExport {
   isFavorite: boolean;
   createdAt: string;
   thumbBlobBase64?: string;
+}
+
+interface MusicTrackExport {
+  id: string;
+  name: string;
+  blobBase64: string;
+  blobType: string;
+  createdAt: string;
+}
+
+interface MovieExport {
+  id: string;
+  tripId: string;
+  name: string;
+  blobBase64: string;
+  blobType: string;
+  createdAt: string;
 }
 
 /* ───────── ヘルパー:Blob ↔ Base64 ───────── */
@@ -64,13 +84,15 @@ function base64ToBlob(base64: string, type: string): Blob {
 /* ───────── エクスポート(全データバックアップ) ───────── */
 
 export async function exportAllData(): Promise<ExportData> {
-  const [trips, flights, hotels, spots, meals, photos] = await Promise.all([
+  const [trips, flights, hotels, spots, meals, photos, musicTracks, movies] = await Promise.all([
     db.trips.toArray(),
     db.flights.toArray(),
     db.hotels.toArray(),
     db.spots.toArray(),
     db.meals.toArray(),
     db.photos.toArray(),
+    db.musicTracks.toArray(),
+    db.movies.toArray(),
   ]);
 
   const photosExport: PhotoExport[] = await Promise.all(
@@ -87,6 +109,27 @@ export async function exportAllData(): Promise<ExportData> {
     }))
   );
 
+  const musicTracksExport: MusicTrackExport[] = await Promise.all(
+    musicTracks.map(async (m) => ({
+      id: m.id,
+      name: m.name,
+      blobBase64: await blobToBase64(m.blob),
+      blobType: m.blob.type || 'audio/mpeg',
+      createdAt: m.createdAt,
+    }))
+  );
+
+  const moviesExport: MovieExport[] = await Promise.all(
+    movies.map(async (m) => ({
+      id: m.id,
+      tripId: m.tripId,
+      name: m.name,
+      blobBase64: await blobToBase64(m.blob),
+      blobType: m.blob.type || 'video/mp4',
+      createdAt: m.createdAt,
+    }))
+  );
+
   return {
     formatVersion: 1,
     exportedAt: new Date().toISOString(),
@@ -97,6 +140,8 @@ export async function exportAllData(): Promise<ExportData> {
     spots,
     meals,
     photos: photosExport,
+    musicTracks: musicTracksExport,
+    movies: moviesExport,
   };
 }
 
@@ -140,6 +185,8 @@ export interface ImportResult {
   spots: number;
   meals: number;
   photos: number;
+  musicTracks: number;
+  movies: number;
 }
 
 export async function importDataFromJson(jsonString: string): Promise<ImportResult> {
@@ -156,7 +203,7 @@ export async function importDataFromJson(jsonString: string): Promise<ImportResu
 
   const data = parsed;
 
-  await db.transaction('rw', [db.trips, db.flights, db.hotels, db.spots, db.meals, db.photos], async () => {
+  await db.transaction('rw', [db.trips, db.flights, db.hotels, db.spots, db.meals, db.photos, db.musicTracks, db.movies], async () => {
 
     await db.trips.bulkPut(data.trips);
     await db.flights.bulkPut(data.flights);
@@ -175,6 +222,24 @@ export async function importDataFromJson(jsonString: string): Promise<ImportResu
       createdAt: p.createdAt,
     }));
     await db.photos.bulkPut(photosRestored);
+
+    // 旧形式のバックアップには musicTracks / movies が無いので空配列で扱う
+    const musicTracksRestored: MusicTrack[] = (data.musicTracks ?? []).map((m) => ({
+      id: m.id,
+      name: m.name,
+      blob: base64ToBlob(m.blobBase64, m.blobType),
+      createdAt: m.createdAt,
+    }));
+    await db.musicTracks.bulkPut(musicTracksRestored);
+
+    const moviesRestored: Movie[] = (data.movies ?? []).map((m) => ({
+      id: m.id,
+      tripId: m.tripId,
+      name: m.name,
+      blob: base64ToBlob(m.blobBase64, m.blobType),
+      createdAt: m.createdAt,
+    }));
+    await db.movies.bulkPut(moviesRestored);
   });
 
   return {
@@ -184,6 +249,8 @@ export async function importDataFromJson(jsonString: string): Promise<ImportResu
     spots: data.spots.length,
     meals: data.meals.length,
     photos: data.photos.length,
+    musicTracks: data.musicTracks?.length ?? 0,
+    movies: data.movies?.length ?? 0,
   };
 }
 
